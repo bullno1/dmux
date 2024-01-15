@@ -4,15 +4,20 @@ async function main(_args: string[]) {
   const debuggerCmd = new Deno.Command("lldb-vscode", {
     stdin: "piped",
     stdout: "piped",
-    stderr: "piped",
+    stderr: "null",
   });
   const debuggerProc = debuggerCmd.spawn();
 
-  const client = new DapClient(
-    debuggerProc.stdin.getWriter(),
-    debuggerProc.stdout.getReader(),
-  );
-  console.log(await client.sendRequest("initialize", {}));
+  const writer = debuggerProc.stdin.getWriter();
+  const reader = debuggerProc.stdout.getReader()
+  const client = new DapClient(writer, reader);
+
+  try {
+    console.log(await client.sendRequest("initialize", {}));
+  } finally {
+    await writer.close();
+    await client.stop();
+  }
 }
 
 if (import.meta.main) {

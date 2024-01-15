@@ -38,7 +38,6 @@ export class MessageReader {
     // Read headers
     this.headers.clear();
     while (true) {
-      console.log("Read line");
       const line = await this.readLine();
       if (line.length > 0) {
         const [header, value] = line.split(": ", 2);
