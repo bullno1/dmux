@@ -1,4 +1,4 @@
-import { Client as DapClient } from "./dap.ts";
+import { Client as DapClient } from "./dap/client.ts";
 
 async function main(_args: string[]) {
   const debuggerCmd = new Deno.Command("lldb-vscode", {
@@ -12,7 +12,6 @@ async function main(_args: string[]) {
     debuggerProc.stdin.getWriter(),
     debuggerProc.stdout.getReader(),
   );
-  client.startLoop();
   console.log(await client.sendRequest("initialize", {}));
 }
 
