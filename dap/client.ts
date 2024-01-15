@@ -1,6 +1,7 @@
 import { MessageReader, writeMessage } from "./io.ts";
-import { Response as ResponseSchema } from "./schema.ts";
+import { Event as EventSchema, Response as ResponseSchema } from "./schema.ts";
 import { Static } from "../deps/typebox.ts";
+import { EventEmitter } from "../deps/event_emitter.ts";
 
 interface Deferred<T> {
   resolve(result: T): void;
@@ -9,7 +10,11 @@ interface Deferred<T> {
 
 type Response = Static<typeof ResponseSchema>;
 
-export class Client {
+interface ClientEvents {
+  event: (message: Static<typeof EventSchema>) => void;
+}
+
+export class Client extends EventEmitter<ClientEvents> {
   private requestSeq = 0;
   private pendingRequests = new Map<number, Deferred<Response>>();
   private messageReader: MessageReader;
@@ -20,6 +25,7 @@ export class Client {
     private requestWriter: WritableStreamDefaultWriter<Uint8Array>,
     responseReader: ReadableStreamDefaultReader<Uint8Array>,
   ) {
+    super();
     this.messageReader = new MessageReader(responseReader);
   }
 
@@ -72,6 +78,7 @@ export class Client {
       const message = await this.messageReader.read();
       switch (message.type) {
         case "event":
+          this.emit("event", message);
           break;
         case "response":
           {
