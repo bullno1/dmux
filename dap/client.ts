@@ -1,6 +1,10 @@
 import { MessageReader, writeMessage } from "./io.ts";
-import { Event as EventSchema, Response as ResponseSchema } from "./schema.ts";
-import { Static } from "../deps/typebox.ts";
+import {
+  Event as EventSchema,
+  Message as MessageSchema,
+  Response as ResponseSchema,
+} from "./schema.ts";
+import { Static, TSchema, TypeCompiler } from "../deps/typebox.ts";
 import { EventEmitter } from "../deps/event_emitter.ts";
 
 interface Deferred<T> {
@@ -13,6 +17,11 @@ type Response = Static<typeof ResponseSchema>;
 interface ClientEvents {
   event: (message: Static<typeof EventSchema>) => void;
 }
+
+export type Wrapper<
+  TRequest extends TSchema,
+  TResponse extends TSchema,
+> = (args: Static<TRequest>) => Promise<Static<TResponse>>;
 
 export class Client extends EventEmitter<ClientEvents> {
   private messageSeq = 0;
@@ -27,6 +36,30 @@ export class Client extends EventEmitter<ClientEvents> {
   ) {
     super();
     this.messageReader = new MessageReader(responseReader);
+  }
+
+  makeWrapper<
+    TRequest extends TSchema,
+    TResponse extends TSchema,
+  >(
+    command: string,
+    _requestSchema: TRequest,
+    responseSchema: TResponse,
+  ): Wrapper<TRequest, TResponse> {
+    const responseChecker = TypeCompiler.Compile(responseSchema);
+    return async (args) => {
+      const response = await this.sendRequest(command, args);
+
+      if (!response.success) {
+        throw new InvocationError(response.message, response.body?.error);
+      }
+
+      if (!responseChecker.Check(response.body)) {
+        throw new ProtocolError("Invalid response from server");
+      }
+
+      return response.body;
+    };
   }
 
   async sendRequest(command: string, args: unknown): Promise<Response> {
@@ -105,3 +138,11 @@ export class Client extends EventEmitter<ClientEvents> {
 }
 
 export class ClientError extends Error {}
+
+export class ProtocolError extends Error {}
+
+export class InvocationError extends Error {
+  constructor(message: string, public extra?: Static<typeof MessageSchema>) {
+    super(message);
+  }
+}

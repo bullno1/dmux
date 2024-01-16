@@ -70,8 +70,5 @@ export class MessageReader {
 
 export class IOError extends Error {}
 
-export class StreamEnded extends IOError {
-}
-
 export class FormatError extends IOError {
 }
