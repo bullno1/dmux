@@ -1,16 +1,22 @@
 import { Client as DapClient, ServerEvent as DapEvent } from "../dap/client.ts";
+import { runServer } from "../dap/server.ts";
+import {
+  makeClientStub,
+  makeRequestHandler,
+  makeReverseProxy,
+} from "../dap/wrapper.ts";
 import { Output } from "../dap/schema.ts";
-import { ProtocolSpec } from "../dap/spec.ts";
+import { ProtocolSpec as DapProtocolSpec } from "../dap/spec.ts";
+import { ProtocolSpec as DmuxProtocolSpec } from "../dmux/spec.ts";
 import {
   ArgumentValue,
   Command,
   EnumType,
   ValidationError,
-} from "../deps/cliffy.ts";
+} from "../deps/cliffy/command.ts";
 import { TypeCompiler } from "../deps/typebox.ts";
 import { getLogger } from "../logging.ts";
-
-const logger = getLogger({ name: "server" });
+import { superslug } from "../deps/superslug.ts";
 
 const OutputSchemaChecker = TypeCompiler.Compile(Output);
 
@@ -35,7 +41,7 @@ enum Mode {
 
 export const Cmd = new Command()
   .name("server")
-  .description("The server for other components.")
+  .description("The debugger multiplexer server.")
   .option("--adapter <path:string>", "Path to the debug adapter.", {
     default: "lldb-vscode",
   })
@@ -44,6 +50,10 @@ export const Cmd = new Command()
   .option("--mode <mode:Mode>", "Debug mode.", {
     required: true,
   })
+  .option(
+    "--session-name <path:string>",
+    "Name for the session. A random one will be generated if omitted.",
+  )
   .option(
     "--args <args:JSONString>",
     "Arguments for the adapter. Must be a valid JSON string.",
@@ -55,6 +65,7 @@ export const Cmd = new Command()
   .action(async ({
     adapter,
     mode,
+    sessionName,
     args,
     argsFile,
   }) => {
@@ -72,10 +83,24 @@ export const Cmd = new Command()
 
     const writer = debuggerProc.stdin.getWriter();
     const reader = debuggerProc.stdout.getReader();
-    const client = new DapClient(writer, reader);
+    const dapClient = new DapClient(writer, reader);
 
-    const dapLogger = logger.child({ name: "dap" });
-    client.on("event", (event) => {
+    if (sessionName === undefined) {
+      sessionName = superslug({
+        separator: "-",
+        format: "lowercase",
+      });
+    }
+
+    const dmuxServer = Deno.listen({
+      transport: "unix",
+      path: `\0dmux/${sessionName}`,
+    });
+    const logger = getLogger({ name: "server", sessionName });
+    //const serverAbortController = new AbortController();
+
+    const dapLogger = getLogger({ name: "dap" });
+    dapClient.on("event", (event) => {
       if (event.event === "output" && OutputSchemaChecker.Check(event.body)) {
         if (event.body?.group) console.group(event.body?.group);
         switch (event.body?.category) {
@@ -92,39 +117,63 @@ export const Cmd = new Command()
       }
     });
 
-    const wrapper = client.makeWrapper(ProtocolSpec);
+    const dap = makeClientStub(dapClient, DapProtocolSpec);
 
     try {
       const initializedEvent = new Promise<void>((resolve) => {
         const listener = (event: DapEvent) => {
           if (event.event === "initialized") {
             resolve();
-            client.off("event", listener);
+            dapClient.off("event", listener);
           }
         };
 
-        client.on("event", listener);
+        dapClient.on("event", listener);
       });
 
-      const capabilities = await wrapper.initialize({ adapterID: "dap" });
+      const capabilities = await dap.initialize({ adapterID: "dap" });
       logger.debug("Adapter capabilities:", capabilities);
 
       const debuggerArgs = argsFromFile || args || {};
       switch (mode) {
         case Mode.Launch:
-          logger.debug(await wrapper.launch(debuggerArgs));
+          logger.debug(await dap.launch(debuggerArgs));
           break;
         case Mode.Attach:
-          logger.debug(await wrapper.attach(debuggerArgs));
+          logger.debug(await dap.attach(debuggerArgs));
           break;
       }
 
       await initializedEvent;
       logger.info("Initialized");
 
-      await wrapper.configurationDone({});
+      await dap.configurationDone({});
+
+      await runServer(
+        dmuxServer,
+        {
+          onConnect: async (_connection) => {
+          },
+          onDisconnect: async (_connection) => {
+          },
+          onShutdown: async () => {
+          },
+          onRequest: makeRequestHandler<typeof DmuxProtocolSpec>(
+            {
+              "dmux/info": (_args) =>
+                Promise.resolve({
+                  adapter: {
+                    capabilities,
+                  },
+                }),
+            },
+            makeReverseProxy(dapClient),
+          ),
+        },
+      );
     } finally {
-      //await writer.close();
-      await client.stop();
+      dmuxServer.close();
+      await writer.close();
+      await dapClient.stop();
     }
   });

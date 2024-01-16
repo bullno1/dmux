@@ -1,11 +1,8 @@
 import { MessageReader, writeMessage } from "./io.ts";
-import {
-  Event as EventSchema,
-  Message as MessageSchema,
-  Response as ResponseSchema,
-} from "./schema.ts";
-import { Static, TSchema, TypeCompiler } from "../deps/typebox.ts";
+import { Event as EventSchema, Response as ResponseSchema } from "./schema.ts";
+import { Static } from "../deps/typebox.ts";
 import { EventEmitter } from "../deps/event_emitter.ts";
+import { waitForAbort } from "../utils/abort.ts";
 
 interface Deferred<T> {
   resolve(result: T): void;
@@ -21,34 +18,6 @@ interface ClientEvents {
   error: (error: Error) => void;
 }
 
-export type WrapperFn<
-  TRequest extends TSchema,
-  TResponse extends TSchema,
-> = (args: Static<TRequest>) => Promise<Static<TResponse>>;
-
-export type WrapperSpec<
-  TRequest extends TSchema = TSchema,
-  TResponse extends TSchema = TSchema,
-> = {
-  [request: string]: RequestSpec<TRequest, TResponse>;
-};
-
-type RequestSpec<
-  TRequest extends TSchema = TSchema,
-  TResponse extends TSchema = TSchema,
-> = {
-  request: TRequest;
-  response: TResponse;
-};
-
-type WrappedRequest<T extends RequestSpec> = T extends
-  RequestSpec<infer TRequest, infer TResponse> ? WrapperFn<TRequest, TResponse>
-  : never;
-
-export type Wrapper<T extends WrapperSpec> = {
-  [request in keyof T]: WrappedRequest<T[request]>;
-};
-
 export class Client extends EventEmitter<ClientEvents> {
   private messageSeq = 0;
   private pendingRequests = new Map<number, Deferred<Response>>();
@@ -58,48 +27,10 @@ export class Client extends EventEmitter<ClientEvents> {
 
   constructor(
     private requestWriter: WritableStreamDefaultWriter<Uint8Array>,
-    responseReader: ReadableStreamDefaultReader<Uint8Array>,
+    private responseReader: ReadableStreamDefaultReader<Uint8Array>,
   ) {
     super();
     this.messageReader = new MessageReader(responseReader);
-  }
-
-  wrapRequest<
-    TRequest extends TSchema,
-    TResponse extends TSchema,
-  >(
-    command: string,
-    _requestSchema: TRequest,
-    responseSchema: TResponse,
-  ): WrapperFn<TRequest, TResponse> {
-    const responseChecker = TypeCompiler.Compile(responseSchema);
-    return async (args) => {
-      const response = await this.sendRequest(command, args);
-
-      if (!response.success) {
-        throw new InvocationError(response.message, response.body?.error);
-      }
-
-      if (!responseChecker.Check(response.body)) {
-        console.log(response.body);
-        throw new ProtocolError(
-          `Invalid response from server: ${response.body}`,
-        );
-      }
-
-      return response.body;
-    };
-  }
-
-  makeWrapper<T extends WrapperSpec>(spec: T): Wrapper<T> {
-    return Object.fromEntries(
-      Object.entries(spec).map(([command, spec]) => {
-        return [
-          command,
-          this.wrapRequest(command, spec.request, spec.response),
-        ];
-      }),
-    ) as Wrapper<T>;
   }
 
   async sendRequest(command: string, args: unknown): Promise<Response> {
@@ -144,11 +75,20 @@ export class Client extends EventEmitter<ClientEvents> {
       await this.readLoopPromise;
       this.readLoopPromise = null;
     }
+
+    await this.requestWriter.close();
+    await this.responseReader.cancel();
   }
 
   private async readLoop(abortSignal: AbortSignal): Promise<void> {
+    const abortPromise = waitForAbort(abortSignal, null);
     while (!abortSignal.aborted) {
-      const message = await this.messageReader.read();
+      const message = await Promise.race([
+        this.messageReader.read(),
+        abortPromise,
+      ]);
+      if (message === null) break;
+
       switch (message.type) {
         case "event":
           this.emit("event", message);
@@ -178,11 +118,3 @@ export class Client extends EventEmitter<ClientEvents> {
 }
 
 export class ClientError extends Error {}
-
-export class ProtocolError extends Error {}
-
-export class InvocationError extends Error {
-  constructor(message: string, public extra?: Static<typeof MessageSchema>) {
-    super(message);
-  }
-}

@@ -1,4 +1,4 @@
-import { concat, indexOf } from "../deps/bytes.ts";
+import { concat, indexOf } from "../deps/std/bytes.ts";
 import { decodeText } from "./text.ts";
 
 export class ReadBuffer {

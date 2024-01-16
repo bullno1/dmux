@@ -1,5 +1,10 @@
 import { Static, Type, TypeCompiler } from "../deps/typebox.ts";
-import { Event, Request, Response } from "./schema.ts";
+import {
+  Event,
+  Message as ErrorMessageSchema,
+  Request,
+  Response,
+} from "./schema.ts";
 import { ReadBuffer, readLine, readN } from "../utils/read.ts";
 import { decodeText, encodeText } from "../utils/text.ts";
 
@@ -7,13 +12,16 @@ const CRLF = new Uint8Array([13, 10]);
 
 export const ContentLengthHeader = "Content-Length";
 
-const MessageSchema = Type.Union([Request, Response, Event]);
-const MessageSchemaChecker = TypeCompiler.Compile(MessageSchema);
-export type Message = Static<typeof MessageSchema>;
+const ProtocolMessageSchema = Type.Union([Request, Response, Event]);
+const ProtocolMessageSchemaChecker = TypeCompiler.Compile(
+  ProtocolMessageSchema,
+);
+export type ProtocolMessage = Static<typeof ProtocolMessageSchema>;
+export type ErrorMessage = Static<typeof ErrorMessageSchema>;
 
 export async function writeMessage(
   writer: WritableStreamDefaultWriter<Uint8Array>,
-  message: Message,
+  message: ProtocolMessage,
 ): Promise<void> {
   await writer.ready;
 
@@ -31,7 +39,7 @@ export class MessageReader {
   constructor(private reader: ReadableStreamDefaultReader<Uint8Array>) {
   }
 
-  async read(): Promise<Message> {
+  async read(): Promise<ProtocolMessage> {
     // Read headers
     this.headers.clear();
     while (true) {
@@ -60,7 +68,7 @@ export class MessageReader {
     // Process message
     const messageStr = decodeText(body);
     const message: unknown = JSON.parse(messageStr);
-    if (!MessageSchemaChecker.Check(message)) {
+    if (!ProtocolMessageSchemaChecker.Check(message)) {
       throw new FormatError("Invalid message");
     }
 
@@ -68,7 +76,14 @@ export class MessageReader {
   }
 }
 
-export class IOError extends Error {}
+export class ProtocolError extends Error {}
 
-export class FormatError extends IOError {
+export class FormatError extends ProtocolError {}
+
+export class UnexpectedMessage extends ProtocolError {}
+
+export class InvocationError extends ProtocolError {
+  constructor(message: string, public extra?: ErrorMessage) {
+    super(message);
+  }
 }
