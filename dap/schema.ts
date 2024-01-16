@@ -202,4 +202,4 @@ export const Output = Type.Object({
   data: Type.Optional(Type.Unknown()),
 });
 
-export const Empty = Type.Undefined();
+export const Ignored = Type.Optional(Type.Unknown());

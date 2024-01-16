@@ -21,10 +21,33 @@ interface ClientEvents {
   error: (error: Error) => void;
 }
 
-export type Wrapper<
+export type WrapperFn<
   TRequest extends TSchema,
   TResponse extends TSchema,
 > = (args: Static<TRequest>) => Promise<Static<TResponse>>;
+
+export type WrapperSpec<
+  TRequest extends TSchema = TSchema,
+  TResponse extends TSchema = TSchema,
+> = {
+  [request: string]: RequestSpec<TRequest, TResponse>;
+};
+
+type RequestSpec<
+  TRequest extends TSchema = TSchema,
+  TResponse extends TSchema = TSchema,
+> = {
+  request: TRequest;
+  response: TResponse;
+};
+
+type WrappedRequest<T extends RequestSpec> = T extends
+  RequestSpec<infer TRequest, infer TResponse> ? WrapperFn<TRequest, TResponse>
+  : never;
+
+export type Wrapper<T extends WrapperSpec> = {
+  [request in keyof T]: WrappedRequest<T[request]>;
+};
 
 export class Client extends EventEmitter<ClientEvents> {
   private messageSeq = 0;
@@ -41,14 +64,14 @@ export class Client extends EventEmitter<ClientEvents> {
     this.messageReader = new MessageReader(responseReader);
   }
 
-  makeWrapper<
+  wrapRequest<
     TRequest extends TSchema,
     TResponse extends TSchema,
   >(
     command: string,
     _requestSchema: TRequest,
     responseSchema: TResponse,
-  ): Wrapper<TRequest, TResponse> {
+  ): WrapperFn<TRequest, TResponse> {
     const responseChecker = TypeCompiler.Compile(responseSchema);
     return async (args) => {
       const response = await this.sendRequest(command, args);
@@ -66,6 +89,17 @@ export class Client extends EventEmitter<ClientEvents> {
 
       return response.body;
     };
+  }
+
+  makeWrapper<T extends WrapperSpec>(spec: T): Wrapper<T> {
+    return Object.fromEntries(
+      Object.entries(spec).map(([command, spec]) => {
+        return [
+          command,
+          this.wrapRequest(command, spec.request, spec.response),
+        ];
+      }),
+    ) as Wrapper<T>;
   }
 
   async sendRequest(command: string, args: unknown): Promise<Response> {

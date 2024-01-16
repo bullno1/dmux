@@ -2,7 +2,7 @@ import { Client as DapClient, ServerEvent as DapEvent } from "../dap/client.ts";
 import {
   AttachRequestArguments,
   Capabilities,
-  Empty,
+  Ignored,
   InitializeRequestArguments,
   LaunchRequestArguments,
   Output,
@@ -98,6 +98,22 @@ export const Cmd = new Command()
       }
     });
 
+    const wrapperSpec = {
+      initialize: {
+        request: InitializeRequestArguments,
+        response: Capabilities,
+      },
+      launch: {
+        request: LaunchRequestArguments,
+        response: Ignored,
+      },
+      attach: {
+        request: AttachRequestArguments,
+        response: Ignored,
+      },
+    };
+    const wrapper = client.makeWrapper(wrapperSpec);
+
     try {
       const initializedEvent = new Promise<void>((resolve) => {
         const listener = (event: DapEvent) => {
@@ -110,39 +126,23 @@ export const Cmd = new Command()
         client.on("event", listener);
       });
 
-      const initialize = client.makeWrapper(
-        "initialize",
-        InitializeRequestArguments,
-        Capabilities,
-      );
-      const capabilities = await initialize({ adapterID: "dap" });
+      const capabilities = await wrapper.initialize({ adapterID: "dap" });
       logger.debug("Adapter capabilities:", capabilities);
-
-      const launch = client.makeWrapper(
-        "launch",
-        LaunchRequestArguments,
-        Empty,
-      );
-      const attach = client.makeWrapper(
-        "attach",
-        AttachRequestArguments,
-        Empty,
-      );
 
       const debuggerArgs = argsFromFile || args || {};
       switch (mode) {
         case Mode.Launch:
-          logger.debug(await launch(debuggerArgs));
+          logger.debug(await wrapper.launch(debuggerArgs));
           break;
         case Mode.Attach:
-          logger.debug(await attach(debuggerArgs));
+          logger.debug(await wrapper.attach(debuggerArgs));
           break;
       }
 
       await initializedEvent;
       logger.info("Initialized");
     } finally {
-      await writer.close();
+      //await writer.close();
       await client.stop();
     }
   });
