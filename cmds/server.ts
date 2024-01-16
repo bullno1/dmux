@@ -1,4 +1,4 @@
-import { Client as DapClient } from "../dap/client.ts";
+import { Client as DapClient, ServerEvent as DapEvent } from "../dap/client.ts";
 import {
   AttachRequestArguments,
   Capabilities,
@@ -99,13 +99,24 @@ export const Cmd = new Command()
     });
 
     try {
+      const initializedEvent = new Promise<void>((resolve) => {
+        const listener = (event: DapEvent) => {
+          if (event.event === "initialized") {
+            resolve();
+            client.off("event", listener);
+          }
+        };
+
+        client.on("event", listener);
+      });
+
       const initialize = client.makeWrapper(
         "initialize",
         InitializeRequestArguments,
         Capabilities,
       );
       const capabilities = await initialize({ adapterID: "dap" });
-      logger.debug("Initialized", capabilities);
+      logger.debug("Adapter capabilities:", capabilities);
 
       const launch = client.makeWrapper(
         "launch",
@@ -114,7 +125,7 @@ export const Cmd = new Command()
       );
       const attach = client.makeWrapper(
         "attach",
-        LaunchRequestArguments,
+        AttachRequestArguments,
         Empty,
       );
 
@@ -127,6 +138,9 @@ export const Cmd = new Command()
           logger.debug(await attach(debuggerArgs));
           break;
       }
+
+      await initializedEvent;
+      logger.info("Initialized");
     } finally {
       await writer.close();
       await client.stop();

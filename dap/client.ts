@@ -59,7 +59,9 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (!responseChecker.Check(response.body)) {
         console.log(response.body);
-        throw new ProtocolError(`Invalid response from server: ${response.body}`);
+        throw new ProtocolError(
+          `Invalid response from server: ${response.body}`,
+        );
       }
 
       return response.body;
