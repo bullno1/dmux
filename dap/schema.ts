@@ -53,9 +53,9 @@ export const Response = Type.Intersect([
     Type.Object({
       success: Type.Literal(false),
       message: Type.String(),
-      body: Type.Object({
+      body: Type.Optional(Type.Object({
         error: Type.Optional(Message),
-      }),
+      })),
     }),
   ]),
 ]);
@@ -110,6 +110,11 @@ export const ChecksumAlgorithm = Type.Union([
   Type.Literal("timestamp"),
 ]);
 
+export const Checksum = Type.Object({
+  algorithm: ChecksumAlgorithm,
+  checksum: Type.String(),
+});
+
 export const Capabilities = Type.Object({
   supportsConfigurationDoneRequest: Type.Optional(Type.Boolean()),
   supportsFunctionBreakpoints: Type.Optional(Type.Boolean()),
@@ -153,3 +158,48 @@ export const Capabilities = Type.Object({
   supportsExceptionFilterOptions: Type.Optional(Type.Boolean()),
   supportsSingleThreadExecutionRequests: Type.Optional(Type.Boolean()),
 });
+
+export const Source = Type.Recursive((This) =>
+  Type.Object({
+    name: Type.Optional(Type.String()),
+    path: Type.Optional(Type.String()),
+    sourceReference: Type.Optional(Type.Number()),
+    presentationHint: Type.Optional(
+      Type.Union([
+        Type.Literal("normal"),
+        Type.Literal("emphasize"),
+        Type.Literal("deemphasize"),
+      ]),
+    ),
+    origin: Type.Optional(Type.String()),
+    sources: Type.Optional(Type.Array(This)),
+    adapterData: Type.Optional(Type.Unknown()),
+    checksums: Type.Optional(Type.Array(Checksum)),
+  })
+);
+
+export const LaunchRequestArguments = Type.Object({
+  noDebug: Type.Optional(Type.Boolean()),
+  __restart: Type.Optional(Type.Any()),
+});
+
+export const AttachRequestArguments = Type.Object({
+  __restart: Type.Optional(Type.Any()),
+});
+
+export const Output = Type.Object({
+  category: Type.Optional(Type.String()),
+  output: Type.String(),
+  group: Type.Optional(Type.Union([
+    Type.Literal("start"),
+    Type.Literal("startCollapsed"),
+    Type.Literal("end"),
+  ])),
+  variablesReference: Type.Optional(Type.Number()),
+  source: Type.Optional(Source),
+  line: Type.Optional(Type.Number()),
+  column: Type.Optional(Type.Number()),
+  data: Type.Optional(Type.Unknown()),
+});
+
+export const Empty = Type.Undefined();

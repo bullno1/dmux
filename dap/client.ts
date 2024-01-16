@@ -14,8 +14,11 @@ interface Deferred<T> {
 
 type Response = Static<typeof ResponseSchema>;
 
+export type ServerEvent = Static<typeof EventSchema>;
+
 interface ClientEvents {
-  event: (message: Static<typeof EventSchema>) => void;
+  event: (message: ServerEvent) => void;
+  error: (error: Error) => void;
 }
 
 export type Wrapper<
@@ -55,7 +58,8 @@ export class Client extends EventEmitter<ClientEvents> {
       }
 
       if (!responseChecker.Check(response.body)) {
-        throw new ProtocolError("Invalid response from server");
+        console.log(response.body);
+        throw new ProtocolError(`Invalid response from server: ${response.body}`);
       }
 
       return response.body;
@@ -66,10 +70,10 @@ export class Client extends EventEmitter<ClientEvents> {
     if (this.readLoopPromise === null) {
       this.abortController = new AbortController();
       this.readLoopPromise = this.readLoop(this.abortController.signal).catch(
-        (e) => {
-          this.terminatePendingRequests(
-            new ClientError("Read loop error", { cause: e }),
-          );
+        (e: unknown) => {
+          const error = new ClientError("Read loop error", { cause: e });
+          this.emit("error", error);
+          this.terminatePendingRequests(error);
         },
       ).finally(() => {
         this.terminatePendingRequests(new ClientError("Read loop terminated"));
