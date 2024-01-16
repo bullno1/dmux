@@ -14,4 +14,8 @@ export const ProtocolSpec = {
     request: Ignored,
     response: DmuxInfoResponse,
   },
+  "dmux/listen": {
+    request: Ignored,
+    response: Ignored,
+  },
 };

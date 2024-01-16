@@ -202,4 +202,13 @@ export const Output = Type.Object({
   data: Type.Optional(Type.Unknown()),
 });
 
+export const Thread = Type.Object({
+  id: Type.Number(),
+  name: Type.String(),
+});
+
+export const ThreadsResponse = Type.Object({
+  threads: Type.Array(Thread),
+});
+
 export const Ignored = Type.Optional(Type.Unknown());

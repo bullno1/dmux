@@ -166,6 +166,7 @@ export const Cmd = new Command()
                     capabilities,
                   },
                 }),
+              "dmux/listen": (_args) => Promise.resolve({}),
             },
             makeReverseProxy(dapClient),
           ),

@@ -4,6 +4,7 @@ import {
   Ignored,
   InitializeRequestArguments,
   LaunchRequestArguments,
+  ThreadsResponse,
 } from "./schema.ts";
 
 export const ProtocolSpec = {
@@ -22,5 +23,9 @@ export const ProtocolSpec = {
   configurationDone: {
     request: Ignored,
     response: Ignored,
+  },
+  threads: {
+    request: Ignored,
+    response: ThreadsResponse,
   },
 };

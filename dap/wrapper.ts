@@ -62,8 +62,13 @@ export function makeRequestHandler<T extends ProtocolSpec>(
 }
 
 export function makeReverseProxy(client: Client): RequestHandler {
-  return (_connection, command, args) => {
-    return client.sendRequest(command, args);
+  return async (_connection, command, args) => {
+    const response = await client.sendRequest(command, args);
+    if (response.success) {
+      return response.body;
+    } else {
+      throw new InvocationError(response.message, response?.body?.error);
+    }
   };
 }
 
@@ -85,7 +90,7 @@ function wrapRequest<
     }
 
     if (!responseChecker.Check(response.body)) {
-      console.log(response.body);
+      console.log(response);
       throw new ProtocolError(
         `Invalid response from server: ${response.body}`,
       );
