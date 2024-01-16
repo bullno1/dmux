@@ -1,12 +1,6 @@
 import { Client as DapClient, ServerEvent as DapEvent } from "../dap/client.ts";
-import {
-  AttachRequestArguments,
-  Capabilities,
-  Ignored,
-  InitializeRequestArguments,
-  LaunchRequestArguments,
-  Output,
-} from "../dap/schema.ts";
+import { Output } from "../dap/schema.ts";
+import { ProtocolSpec } from "../dap/spec.ts";
 import {
   ArgumentValue,
   Command,
@@ -98,21 +92,7 @@ export const Cmd = new Command()
       }
     });
 
-    const wrapperSpec = {
-      initialize: {
-        request: InitializeRequestArguments,
-        response: Capabilities,
-      },
-      launch: {
-        request: LaunchRequestArguments,
-        response: Ignored,
-      },
-      attach: {
-        request: AttachRequestArguments,
-        response: Ignored,
-      },
-    };
-    const wrapper = client.makeWrapper(wrapperSpec);
+    const wrapper = client.makeWrapper(ProtocolSpec);
 
     try {
       const initializedEvent = new Promise<void>((resolve) => {
@@ -141,6 +121,8 @@ export const Cmd = new Command()
 
       await initializedEvent;
       logger.info("Initialized");
+
+      await wrapper.configurationDone({});
     } finally {
       //await writer.close();
       await client.stop();
