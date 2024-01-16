@@ -9,7 +9,7 @@ async function main(_args: string[]) {
   const debuggerProc = debuggerCmd.spawn();
 
   const writer = debuggerProc.stdin.getWriter();
-  const reader = debuggerProc.stdout.getReader()
+  const reader = debuggerProc.stdout.getReader();
   const client = new DapClient(writer, reader);
 
   try {

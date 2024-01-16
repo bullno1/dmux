@@ -15,7 +15,7 @@ interface ClientEvents {
 }
 
 export class Client extends EventEmitter<ClientEvents> {
-  private requestSeq = 0;
+  private messageSeq = 0;
   private pendingRequests = new Map<number, Deferred<Response>>();
   private messageReader: MessageReader;
   private abortController: AbortController | null = null;
@@ -45,14 +45,14 @@ export class Client extends EventEmitter<ClientEvents> {
       });
     }
 
-    const requestSeq = this.requestSeq++;
+    const messageSeq = this.messageSeq++;
 
     const result = new Promise<Response>((resolve, reject) => {
-      this.pendingRequests.set(requestSeq, { resolve, reject });
+      this.pendingRequests.set(messageSeq, { resolve, reject });
     });
 
     await writeMessage(this.requestWriter, {
-      seq: requestSeq,
+      seq: messageSeq,
       type: "request",
       command: command,
       arguments: args,
