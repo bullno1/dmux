@@ -1,5 +1,5 @@
 import { Type } from "../deps/typebox.ts";
-import { Capabilities, Stopped } from "../dap/schema.ts";
+import { Capabilities } from "../dap/schema.ts";
 
 export const Ignored = Type.Optional(Type.Unknown());
 
@@ -17,11 +17,11 @@ export const DmuxInfoResponse = Type.Object({
     capabilities: Capabilities,
   }),
   viewFocus: ViewFocus,
-  lastEvents: Type.Partial(
-    Type.Object({
-      stopped: Stopped,
-    }),
-  )
+  //lastEvents: Type.Partial(
+    //Type.Object({
+      //stopped: Stopped,
+    //}),
+  //)
 });
 
 export const ProtocolSpec = {
