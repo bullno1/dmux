@@ -1,12 +1,15 @@
-import { Static, TSchema, TypeCompiler } from "../deps/typebox.ts";
+import { Static, TSchema } from "../deps/typebox.ts";
+import { ClientConnection, ServerHandler } from "./server.ts";
 import { Client } from "./client.ts";
-import { ServerHandler } from "./server.ts";
-import { InvocationError, ProtocolError } from "./io.ts";
+import { InvocationError } from "./io.ts";
 
 export type WrapperFn<
   TRequest extends TSchema,
   TResponse extends TSchema,
-> = (args: Static<TRequest>) => Promise<Static<TResponse>>;
+> = (
+  client: ClientConnection,
+  args: Static<TRequest>,
+) => Promise<Static<TResponse>>;
 
 export type ProtocolSpec<
   TRequest extends TSchema = TSchema,
@@ -33,20 +36,6 @@ export type Stub<T extends ProtocolSpec> = {
 
 export type RequestHandler = ServerHandler["onRequest"];
 
-export function makeClientStub<T extends ProtocolSpec>(
-  client: Client,
-  spec: T,
-): Stub<T> {
-  return Object.fromEntries(
-    Object.entries(spec).map(([command, spec]) => {
-      return [
-        command,
-        wrapRequest(client, command, spec.request, spec.response),
-      ];
-    }),
-  ) as Stub<T>;
-}
-
 export function makeRequestHandler<T extends ProtocolSpec>(
   stub: Stub<T>,
   fallback: RequestHandler,
@@ -54,7 +43,7 @@ export function makeRequestHandler<T extends ProtocolSpec>(
   return (connection, command, args) => {
     if (command in stub) {
       const commandHandler = stub[command];
-      return commandHandler(args);
+      return commandHandler(connection, args);
     } else {
       return fallback(connection, command, args);
     }
@@ -69,33 +58,5 @@ export function makeReverseProxy(client: Client): RequestHandler {
     } else {
       throw new InvocationError(response.message, response?.body?.error);
     }
-  };
-}
-
-function wrapRequest<
-  TRequest extends TSchema,
-  TResponse extends TSchema,
->(
-  client: Client,
-  command: string,
-  _requestSchema: TRequest,
-  responseSchema: TResponse,
-): WrapperFn<TRequest, TResponse> {
-  const responseChecker = TypeCompiler.Compile(responseSchema);
-  return async (args) => {
-    const response = await client.sendRequest(command, args);
-
-    if (!response.success) {
-      throw new InvocationError(response.message, response.body?.error);
-    }
-
-    if (!responseChecker.Check(response.body)) {
-      console.log(response);
-      throw new ProtocolError(
-        `Invalid response from server: ${response.body}`,
-      );
-    }
-
-    return response.body;
   };
 }

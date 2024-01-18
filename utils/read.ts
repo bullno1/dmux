@@ -29,7 +29,7 @@ export class ReadBuffer {
     } else if (this.#accumulator.length === 1) {
       result = this.#accumulator[0];
     } else {
-      result = concat(...this.#accumulator);
+      result = concat(this.#accumulator);
     }
 
     this.#accumulator.length = 0;

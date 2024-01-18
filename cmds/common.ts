@@ -1,7 +1,7 @@
 import { ArgumentValue, ValidationError } from "../deps/cliffy/command.ts";
 import { Select } from "../deps/cliffy/prompt.ts";
 import { ReadBuffer, readLine } from "../utils/read.ts";
-import { makeClientStub, Stub } from "../dap/wrapper.ts";
+import { makeClientStub, Stub } from "../dap/client-wrapper.ts";
 import { Client } from "../dap/client.ts";
 import { ProtocolSpec as DapProtocolSpec } from "../dap/spec.ts";
 import { ProtocolSpec as DmuxProtocolSpec } from "../dmux/spec.ts";

@@ -202,6 +202,16 @@ export const Output = Type.Object({
   data: Type.Optional(Type.Unknown()),
 });
 
+export const Stopped = Type.Object({
+  reason: Type.String(),
+  description: Type.Optional(Type.String()),
+  threadId: Type.Optional(Type.Number()),
+  preserveFocusHint: Type.Optional(Type.Boolean()),
+  text: Type.Optional(Type.String()),
+  allThreadsStopped: Type.Optional(Type.Boolean()),
+  hitBreakpointIds: Type.Optional(Type.Array(Type.Number())),
+});
+
 export const Thread = Type.Object({
   id: Type.Number(),
   name: Type.String(),

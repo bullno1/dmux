@@ -1,24 +1,26 @@
 import { Client as DapClient, ServerEvent as DapEvent } from "../dap/client.ts";
 import { runServer } from "../dap/server.ts";
-import {
-  makeClientStub,
-  makeRequestHandler,
-  makeReverseProxy,
-} from "../dap/wrapper.ts";
-import { Output } from "../dap/schema.ts";
+import { makeClientStub } from "../dap/client-wrapper.ts";
+import { makeRequestHandler, makeReverseProxy } from "../dap/server-wrapper.ts";
+import { Output, Stopped  } from "../dap/schema.ts";
 import { ProtocolSpec as DapProtocolSpec } from "../dap/spec.ts";
-import { ProtocolSpec as DmuxProtocolSpec } from "../dmux/spec.ts";
+import { ProtocolSpec as DmuxProtocolSpec, ViewFocus } from "../dmux/spec.ts";
 import {
   ArgumentValue,
   Command,
   EnumType,
   ValidationError,
 } from "../deps/cliffy/command.ts";
-import { TypeCompiler } from "../deps/typebox.ts";
+import { Static } from "../deps/typebox.ts";
 import { getLogger } from "../logging.ts";
 import { superslug } from "../deps/superslug.ts";
+import { ClientConnection } from "../dap/server.ts";
+import { makeChecker } from "../utils/type-compiler.ts";
 
-const OutputSchemaChecker = TypeCompiler.Compile(Output);
+const Checkers = makeChecker({
+  Output,
+  Stopped,
+});
 
 function JSONString(
   { label, name, value }: ArgumentValue,
@@ -101,7 +103,7 @@ export const Cmd = new Command()
 
     const dapLogger = getLogger({ name: "dap" });
     dapClient.on("event", (event) => {
-      if (event.event === "output" && OutputSchemaChecker.Check(event.body)) {
+      if (event.event === "output" && Checkers.Output.Check(event.body)) {
         if (event.body?.group) console.group(event.body?.group);
         switch (event.body?.category) {
           case "important":
@@ -131,6 +133,32 @@ export const Cmd = new Command()
         dapClient.on("event", listener);
       });
 
+      const listeners = new Set<ClientConnection>();
+      const viewFocus: Static<typeof ViewFocus> = new ViewFocusImpl();
+      const broadcastEvent = async (
+        type: string,
+        body: unknown,
+      ): Promise<void> => {
+        const sendPromises: Promise<void>[] = [];
+        for (const listener of listeners) {
+          sendPromises.push(listener.sendEvent(type, body));
+        }
+        await Promise.allSettled(sendPromises);
+      };
+
+      dapClient.on("event", (event) => {
+        broadcastEvent(event.type, event.body);
+
+        if (
+          event.event === "stopped"
+          && Checkers.Stopped.Check(event.body)
+          && event.body?.threadId !== undefined
+        ) {
+          viewFocus.threadId = event.body.threadId;
+          broadcastEvent("dmux/focus", { focus: viewFocus });
+        }
+      });
+
       const capabilities = await dap.initialize({ adapterID: "dap" });
       logger.debug("Adapter capabilities:", capabilities);
 
@@ -154,19 +182,40 @@ export const Cmd = new Command()
         {
           onConnect: async (_connection) => {
           },
-          onDisconnect: async (_connection) => {
+          onDisconnect: (connection) => {
+            listeners.delete(connection);
+            return Promise.resolve();
           },
           onShutdown: async () => {
           },
           onRequest: makeRequestHandler<typeof DmuxProtocolSpec>(
             {
-              "dmux/info": (_args) =>
+              "dmux/info": (_client, _args) =>
                 Promise.resolve({
                   adapter: {
                     capabilities,
                   },
+                  viewFocus,
                 }),
-              "dmux/listen": (_args) => Promise.resolve({}),
+              "dmux/listen": (client, _args) => {
+                listeners.add(client);
+                return Promise.resolve();
+              },
+              "dmux/focus": async (_client, { focus }) => {
+                if (focus.threadId !== undefined) {
+                  viewFocus.threadId = focus.threadId;
+                }
+
+                if (focus.stackFrameId !== undefined) {
+                  viewFocus.stackFrameId = focus.stackFrameId;
+                }
+
+                await broadcastEvent("dmux/focus", {
+                  focus: viewFocus,
+                });
+
+                return { focus: viewFocus };
+              },
             },
             makeReverseProxy(dapClient),
           ),
@@ -178,3 +227,34 @@ export const Cmd = new Command()
       await dapClient.stop();
     }
   });
+
+class ViewFocusImpl {
+  #threadId: number | undefined = undefined;
+  #stackFrameId: number | undefined = undefined;
+
+  get threadId(): number | undefined {
+    return this.#threadId;
+  }
+
+  set threadId(value: number) {
+    if (this.#threadId !== value) {
+      this.#threadId = value;
+      this.#stackFrameId = undefined;
+    }
+  }
+
+  get stackFrameId(): number | undefined {
+    return this.#stackFrameId;
+  }
+
+  set stackFrameId(value: number) {
+    this.#stackFrameId = value;
+  }
+
+  toJSON() {
+    return {
+      threadId: this.#threadId,
+      stackFrameId: this.#stackFrameId,
+    };
+  }
+}
