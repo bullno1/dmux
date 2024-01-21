@@ -351,7 +351,7 @@ export const EventSpec = {
   exited: Type.Object({
     exitCode: Type.Number(),
   }),
-  initialized: Type.Object({}),
+  initialized: Ignored,
   output: Type.Object({
     category: Type.Optional(Type.String()),
     output: Type.String(),

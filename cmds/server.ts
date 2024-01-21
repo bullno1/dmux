@@ -135,6 +135,7 @@ export const Cmd = new Command()
           break;
       }
 
+      logger.info("Waiting for initialization");
       await initializedEvent;
       logger.info("Initialized");
 

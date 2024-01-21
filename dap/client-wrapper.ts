@@ -2,6 +2,9 @@ import { Static, TSchema, TypeCheck, TypeCompiler } from "../deps/typebox.ts";
 import { Client } from "./client.ts";
 import { InvocationError, ProtocolError } from "./io.ts";
 import { EventEmitter } from "../deps/event_emitter.ts";
+import { getLogger } from "../logging.ts";
+
+const logger = getLogger({ name: "client-wrapper" });
 
 export type RequestSpec<
   TRequest extends TSchema = TSchema,
@@ -103,12 +106,15 @@ function makeEventStub<T extends EventSpec>(
 
   client.on("event", (message) => {
     const checker = checkerTable[message.event];
-    if (checker === undefined) return;
+    if (checker === undefined) {
+      logger.warning("Ignored unknown event", message.event);
+      return;
+    }
 
     if (!checker.Check(message.body)) {
-      throw new ProtocolError(
-        `Invalid event from server: ${message.body}`,
-      );
+      const errors = checker.Errors(message.body);
+      logger.warning("Invalid event", message.event, [...errors]);
+      return;
     }
 
     emitter.emit(message.event, message.body);

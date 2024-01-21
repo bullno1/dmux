@@ -63,7 +63,7 @@ async function locateSession(
     return sessionNameFromCli;
   }
 
-  const availableSessions: string[] = [];
+  const availableSessions = new Set<string>();
   const file = await Deno.open("/proc/net/unix", { read: true });
   const readBuf = new ReadBuffer();
   const reader = file.readable.getReader();
@@ -75,7 +75,7 @@ async function locateSession(
       const parts = line.split(" ");
       const lastPart = parts[parts.length - 1];
       if (lastPart.startsWith(ProcFsSessionPrefix)) {
-        availableSessions.push(lastPart.slice(ProcFsSessionPrefix.length));
+        availableSessions.add(lastPart.slice(ProcFsSessionPrefix.length));
       }
     }
   } catch (e) {
@@ -86,18 +86,20 @@ async function locateSession(
     reader.releaseLock();
   }
 
-  if (availableSessions.length === 0) {
+  if (availableSessions.size === 0) {
     console.log("Could not find any session");
     return Deno.exit(1);
   }
 
-  if (availableSessions.length === 1) {
-    return availableSessions[0];
+  if (availableSessions.size === 1) {
+    for (const session of availableSessions) {
+      return session;
+    }
   }
 
   const choice = await Select.prompt<string>({
     message: "Pick a session",
-    options: availableSessions.map((name) => ({
+    options: [...availableSessions].map((name) => ({
       value: name,
     })),
   });
