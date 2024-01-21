@@ -3,7 +3,25 @@ import { ClientConnection, ServerHandler } from "./server.ts";
 import { Client } from "./client.ts";
 import { InvocationError } from "./io.ts";
 
-export type WrapperFn<
+export type RequestSpec<
+  TRequest extends TSchema = TSchema,
+  TResponse extends TSchema = TSchema,
+> = {
+  [request: string]: MethodSpec<TRequest, TResponse>;
+};
+
+export type RequestStub<T extends RequestSpec> = {
+  [request in keyof T]: WrappedMethod<
+    T[request]["request"],
+    T[request]["response"]
+  >;
+};
+
+export type EventSpec<T extends TSchema = TSchema> = {
+  [event: string]: T;
+};
+
+type WrappedMethod<
   TRequest extends TSchema,
   TResponse extends TSchema,
 > = (
@@ -11,14 +29,7 @@ export type WrapperFn<
   args: Static<TRequest>,
 ) => Promise<Static<TResponse>>;
 
-export type ProtocolSpec<
-  TRequest extends TSchema = TSchema,
-  TResponse extends TSchema = TSchema,
-> = {
-  [request: string]: RequestSpec<TRequest, TResponse>;
-};
-
-type RequestSpec<
+type MethodSpec<
   TRequest extends TSchema = TSchema,
   TResponse extends TSchema = TSchema,
 > = {
@@ -26,18 +37,10 @@ type RequestSpec<
   response: TResponse;
 };
 
-type WrappedRequest<T extends RequestSpec> = T extends
-  RequestSpec<infer TRequest, infer TResponse> ? WrapperFn<TRequest, TResponse>
-  : never;
-
-export type Stub<T extends ProtocolSpec> = {
-  [request in keyof T]: WrappedRequest<T[request]>;
-};
-
 export type RequestHandler = ServerHandler["onRequest"];
 
-export function makeRequestHandler<T extends ProtocolSpec>(
-  stub: Stub<T>,
+export function makeRequestHandler<T extends RequestSpec>(
+  stub: RequestStub<T>,
   fallback: RequestHandler,
 ): RequestHandler {
   return (connection, command, args) => {

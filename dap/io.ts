@@ -1,7 +1,7 @@
 import { Static, Type, TypeCompiler } from "../deps/typebox.ts";
 import {
+  ErrorMessage as ErrorMessageSchema,
   Event,
-  Message as ErrorMessageSchema,
   Request,
   Response,
 } from "./schema.ts";

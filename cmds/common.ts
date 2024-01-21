@@ -1,10 +1,16 @@
 import { ArgumentValue, ValidationError } from "../deps/cliffy/command.ts";
 import { Select } from "../deps/cliffy/prompt.ts";
 import { ReadBuffer, readLine } from "../utils/read.ts";
-import { makeClientStub, Stub } from "../dap/client-wrapper.ts";
+import { ClientStub, makeClientStub } from "../dap/client-wrapper.ts";
 import { Client } from "../dap/client.ts";
-import { ProtocolSpec as DapProtocolSpec } from "../dap/spec.ts";
-import { ProtocolSpec as DmuxProtocolSpec } from "../dmux/spec.ts";
+import {
+  EventSpec as DapEventSpec,
+  RequestSpec as DapRequestSpec,
+} from "../dap/schema.ts";
+import {
+  EventSpec as DmuxEventSpec,
+  RequestSpec as DmuxRequestSpec,
+} from "../dmux/spec.ts";
 
 const LF = new Uint8Array([10]);
 const ProcFsSessionPrefix = "@dmux/";
@@ -24,9 +30,10 @@ export function JSONString(
   }
 }
 
-export type DmuxClientStub =
-  & Stub<typeof DapProtocolSpec>
-  & Stub<typeof DmuxProtocolSpec>;
+export type DmuxClientStub = ClientStub<
+  typeof DapRequestSpec & typeof DmuxRequestSpec,
+  typeof DapEventSpec & typeof DmuxEventSpec
+>;
 
 export async function connectToServer(
   sessionNameFromCli?: string,
@@ -43,7 +50,8 @@ export async function connectToServer(
   );
   const stub = makeClientStub(
     client,
-    Object.assign({}, DapProtocolSpec, DmuxProtocolSpec),
+    Object.assign({}, DapRequestSpec, DmuxRequestSpec),
+    Object.assign({}, DapEventSpec, DmuxEventSpec),
   );
   return [client, stub];
 }

@@ -76,8 +76,10 @@ export class Client extends EventEmitter<ClientEvents> {
       this.readLoopPromise = null;
     }
 
-    await this.requestWriter.close();
-    await this.responseReader.cancel();
+    await Promise.allSettled([
+      this.requestWriter.close(),
+      this.responseReader.cancel(),
+    ]);
   }
 
   private async readLoop(abortSignal: AbortSignal): Promise<void> {

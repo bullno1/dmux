@@ -7,6 +7,9 @@ export const Cmd = new Command()
   .option("--session-name <sessionName:string>", "Session name.")
   .action(async ({ sessionName }) => {
     const [client, stub] = await connectToServer(sessionName);
-    console.log(await stub["dmux/info"]({}));
-    await client.stop();
+    try {
+      console.log(await stub["dmux/info"]({}));
+    } finally {
+      await client.stop();
+    }
   });

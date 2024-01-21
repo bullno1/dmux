@@ -1,10 +1,21 @@
-import { Client as DapClient, ServerEvent as DapEvent } from "../dap/client.ts";
-import { runServer } from "../dap/server.ts";
+import { Client as RawClient } from "../dap/client.ts";
+import { runServer, ServerHandler } from "../dap/server.ts";
 import { makeClientStub } from "../dap/client-wrapper.ts";
-import { makeRequestHandler, makeReverseProxy } from "../dap/server-wrapper.ts";
-import { Output, Stopped  } from "../dap/schema.ts";
-import { ProtocolSpec as DapProtocolSpec } from "../dap/spec.ts";
-import { ProtocolSpec as DmuxProtocolSpec, ViewFocus } from "../dmux/spec.ts";
+import {
+  EventSpec,
+  makeRequestHandler,
+  makeReverseProxy,
+  RequestStub as ServerStub,
+} from "../dap/server-wrapper.ts";
+import {
+  EventSpec as DapEventSpec,
+  RequestSpec as DapRequestSpec,
+} from "../dap/schema.ts";
+import {
+  EventSpec as DmuxEventSpec,
+  RequestSpec as DmuxRequestSpec,
+  ViewFocus,
+} from "../dmux/spec.ts";
 import {
   ArgumentValue,
   Command,
@@ -15,12 +26,6 @@ import { Static } from "../deps/typebox.ts";
 import { getLogger } from "../logging.ts";
 import { superslug } from "../deps/superslug.ts";
 import { ClientConnection } from "../dap/server.ts";
-import { makeChecker } from "../utils/type-compiler.ts";
-
-const Checkers = makeChecker({
-  Output,
-  Stopped,
-});
 
 function JSONString(
   { label, name, value }: ArgumentValue,
@@ -41,6 +46,10 @@ enum Mode {
   Attach = "attach",
 }
 
+type EventSender<T extends EventSpec> = {
+  <Event extends keyof T & string>(event: Event, args: Static<T[Event]>): void;
+};
+
 export const Cmd = new Command()
   .name("server")
   .description("The debugger multiplexer server.")
@@ -59,6 +68,9 @@ export const Cmd = new Command()
   .option(
     "--args <args:JSONString>",
     "Arguments for the adapter. Must be a valid JSON string.",
+    {
+      default: {},
+    },
   )
   .option(
     "--args-file <path:string>",
@@ -85,7 +97,12 @@ export const Cmd = new Command()
 
     const writer = debuggerProc.stdin.getWriter();
     const reader = debuggerProc.stdout.getReader();
-    const dapClient = new DapClient(writer, reader);
+    const rawClient = new RawClient(writer, reader);
+
+    const dapLogger = getLogger({ name: "dap" });
+    rawClient.on("event", (event) => dapLogger.debug(event));
+
+    const dapClient = makeClientStub(rawClient, DapRequestSpec, DapEventSpec);
 
     if (sessionName === undefined) {
       sessionName = superslug({
@@ -99,162 +116,98 @@ export const Cmd = new Command()
       path: `\0dmux/${sessionName}`,
     });
     const logger = getLogger({ name: "server", sessionName });
-    //const serverAbortController = new AbortController();
-
-    const dapLogger = getLogger({ name: "dap" });
-    dapClient.on("event", (event) => {
-      if (event.event === "output" && Checkers.Output.Check(event.body)) {
-        if (event.body?.group) console.group(event.body?.group);
-        switch (event.body?.category) {
-          case "important":
-          case "stderr":
-            dapLogger.warning(event.body.output);
-            break;
-          default:
-            dapLogger.info(event.body.output);
-            break;
-        }
-      } else {
-        dapLogger.debug("Event", event.event, event.body);
-      }
-    });
-
-    const dap = makeClientStub(dapClient, DapProtocolSpec);
 
     try {
       const initializedEvent = new Promise<void>((resolve) => {
-        const listener = (event: DapEvent) => {
-          if (event.event === "initialized") {
-            resolve();
-            dapClient.off("event", listener);
-          }
-        };
-
-        dapClient.on("event", listener);
+        dapClient.once("initialized", () => resolve());
       });
 
-      const listeners = new Set<ClientConnection>();
-      const viewFocus: Static<typeof ViewFocus> = new ViewFocusImpl();
-      const broadcastEvent = async (
-        type: string,
-        body: unknown,
-      ): Promise<void> => {
-        const sendPromises: Promise<void>[] = [];
-        for (const listener of listeners) {
-          sendPromises.push(listener.sendEvent(type, body));
-        }
-        await Promise.allSettled(sendPromises);
-      };
-
-      dapClient.on("event", (event) => {
-        broadcastEvent(event.type, event.body);
-
-        if (
-          event.event === "stopped"
-          && Checkers.Stopped.Check(event.body)
-          && event.body?.threadId !== undefined
-        ) {
-          viewFocus.threadId = event.body.threadId;
-          broadcastEvent("dmux/focus", { focus: viewFocus });
-        }
-      });
-
-      const capabilities = await dap.initialize({ adapterID: "dap" });
+      const capabilities = await dapClient.initialize({ adapterID: "dap" });
       logger.debug("Adapter capabilities:", capabilities);
 
-      const debuggerArgs = argsFromFile || args || {};
+      const debuggerArgs = Object.assign({}, argsFromFile, args);
       switch (mode) {
         case Mode.Launch:
-          logger.debug(await dap.launch(debuggerArgs));
+          logger.debug(await dapClient.launch(debuggerArgs));
           break;
         case Mode.Attach:
-          logger.debug(await dap.attach(debuggerArgs));
+          logger.debug(await dapClient.attach(debuggerArgs));
           break;
       }
 
       await initializedEvent;
       logger.info("Initialized");
 
-      await dap.configurationDone({});
+      await dapClient.configurationDone({});
 
-      await runServer(
-        dmuxServer,
-        {
-          onConnect: async (_connection) => {
-          },
-          onDisconnect: (connection) => {
-            listeners.delete(connection);
-            return Promise.resolve();
-          },
-          onShutdown: async () => {
-          },
-          onRequest: makeRequestHandler<typeof DmuxProtocolSpec>(
-            {
-              "dmux/info": (_client, _args) =>
-                Promise.resolve({
-                  adapter: {
-                    capabilities,
-                  },
-                  viewFocus,
-                }),
-              "dmux/listen": (client, _args) => {
-                listeners.add(client);
-                return Promise.resolve();
-              },
-              "dmux/focus": async (_client, { focus }) => {
-                if (focus.threadId !== undefined) {
-                  viewFocus.threadId = focus.threadId;
-                }
+      const listeners = new Set<ClientConnection>();
+      const viewFocus: Static<typeof ViewFocus> = {
+        threadId: undefined,
+        stackFrameId: undefined,
+      };
 
-                if (focus.stackFrameId !== undefined) {
-                  viewFocus.stackFrameId = focus.stackFrameId;
-                }
+      const broadcastRawEvent = (type: string, body: unknown) => {
+        listeners.forEach((connection) => {
+          connection.sendEvent(type, body).catch(() => {
+            connection.disconnect();
+          });
+        });
+      };
 
-                await broadcastEvent("dmux/focus", {
-                  focus: viewFocus,
-                });
+      rawClient.on("event", (message) => {
+        broadcastRawEvent(message.event, message.body);
+      });
 
-                return { focus: viewFocus };
-              },
+      const broadcastEvent: EventSender<typeof DmuxEventSpec> =
+        broadcastRawEvent;
+
+      const requestHandlers: ServerStub<typeof DmuxRequestSpec> = {
+        "dmux/info": (_client, _args) =>
+          Promise.resolve({
+            adapter: {
+              capabilities,
             },
-            makeReverseProxy(dapClient),
-          ),
+            viewFocus,
+          }),
+        "dmux/listen": (client, _args) => {
+          listeners.add(client);
+          return Promise.resolve();
         },
-      );
+        "dmux/focus": (_client, { focus }) => {
+          if (focus.threadId !== undefined) {
+            viewFocus.threadId = focus.threadId;
+            viewFocus.stackFrameId = undefined;
+          }
+
+          if (focus.stackFrameId !== undefined) {
+            viewFocus.stackFrameId = focus.stackFrameId;
+          }
+
+          broadcastEvent("dmux/focus", { focus: viewFocus });
+          return Promise.resolve({ focus: viewFocus });
+        },
+      };
+
+      const serverHandler: ServerHandler = {
+        onConnect: async (_connection) => {
+        },
+        onDisconnect: (connection) => {
+          listeners.delete(connection);
+          return Promise.resolve();
+        },
+        onShutdown: async () => {
+        },
+        onRequest: makeRequestHandler<typeof DmuxRequestSpec>(
+          requestHandlers,
+          makeReverseProxy(rawClient),
+        ),
+      };
+
+      await runServer(dmuxServer, serverHandler);
     } finally {
       dmuxServer.close();
+      reader.releaseLock();
+      await rawClient.stop();
       await writer.close();
-      await dapClient.stop();
     }
   });
-
-class ViewFocusImpl {
-  #threadId: number | undefined = undefined;
-  #stackFrameId: number | undefined = undefined;
-
-  get threadId(): number | undefined {
-    return this.#threadId;
-  }
-
-  set threadId(value: number) {
-    if (this.#threadId !== value) {
-      this.#threadId = value;
-      this.#stackFrameId = undefined;
-    }
-  }
-
-  get stackFrameId(): number | undefined {
-    return this.#stackFrameId;
-  }
-
-  set stackFrameId(value: number) {
-    this.#stackFrameId = value;
-  }
-
-  toJSON() {
-    return {
-      threadId: this.#threadId,
-      stackFrameId: this.#stackFrameId,
-    };
-  }
-}

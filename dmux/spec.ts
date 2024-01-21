@@ -17,14 +17,9 @@ export const DmuxInfoResponse = Type.Object({
     capabilities: Capabilities,
   }),
   viewFocus: ViewFocus,
-  //lastEvents: Type.Partial(
-    //Type.Object({
-      //stopped: Stopped,
-    //}),
-  //)
 });
 
-export const ProtocolSpec = {
+export const RequestSpec = {
   "dmux/info": {
     request: Ignored,
     response: DmuxInfoResponse,
@@ -37,4 +32,8 @@ export const ProtocolSpec = {
     request: ViewFocusChange,
     response: ViewFocusChange,
   },
+};
+
+export const EventSpec = {
+  "dmux/focus": ViewFocusChange,
 };
