@@ -2,6 +2,9 @@ import { Type } from "../deps/typebox.ts";
 
 // Reference: https://microsoft.github.io/debug-adapter-protocol/specification
 
+// https://microsoft.github.io/debug-adapter-protocol/specification#base-protocol
+// Base {{{
+
 export const ProtocolMessage = Type.Object({
   seq: Type.Number(),
 });
@@ -33,7 +36,7 @@ export const BaseResponse = Type.Composite([
   }),
 ]);
 
-export const Message = Type.Object({
+export const ErrorMessage = Type.Object({
   id: Type.Number(),
   format: Type.String(),
   variables: Type.Optional(Type.Record(Type.String(), Type.String())),
@@ -54,30 +57,18 @@ export const Response = Type.Intersect([
       success: Type.Literal(false),
       message: Type.String(),
       body: Type.Optional(Type.Object({
-        error: Type.Optional(Message),
+        error: Type.Optional(ErrorMessage),
       })),
     }),
   ]),
 ]);
 
-export const InitializeRequestArguments = Type.Object({
-  clientID: Type.Optional(Type.String()),
-  clientName: Type.Optional(Type.String()),
-  adapterID: Type.String(),
-  locale: Type.Optional(Type.String()),
-  linesStartAt1: Type.Optional(Type.Boolean()),
-  columnStartAt1: Type.Optional(Type.Boolean()),
-  pathFormat: Type.Optional(Type.String()),
-  supportsVariableType: Type.Optional(Type.Boolean()),
-  supportsVariablePaging: Type.Optional(Type.Boolean()),
-  supportsRunInTerminalRequest: Type.Optional(Type.Boolean()),
-  supportsMemoryReferences: Type.Optional(Type.Boolean()),
-  supportsProgressReporting: Type.Optional(Type.Boolean()),
-  supportsInvalidatedEvent: Type.Optional(Type.Boolean()),
-  supportsMemoryEvent: Type.Optional(Type.Boolean()),
-  supportsArgsCanBeInterpretedByShell: Type.Optional(Type.Boolean()),
-  supportsStartDebuggingRequest: Type.Optional(Type.Boolean()),
-});
+// }}}
+
+// https://microsoft.github.io/debug-adapter-protocol/specification#types
+// Shared {{{
+
+export const Ignored = Type.Optional(Type.Unknown());
 
 export const ExceptionBreakpointsFilter = Type.Object({
   filter: Type.String(),
@@ -114,6 +105,25 @@ export const Checksum = Type.Object({
   algorithm: ChecksumAlgorithm,
   checksum: Type.String(),
 });
+
+export const Source = Type.Recursive((This) =>
+  Type.Object({
+    name: Type.Optional(Type.String()),
+    path: Type.Optional(Type.String()),
+    sourceReference: Type.Optional(Type.Number()),
+    presentationHint: Type.Optional(
+      Type.Union([
+        Type.Literal("normal"),
+        Type.Literal("emphasize"),
+        Type.Literal("deemphasize"),
+      ]),
+    ),
+    origin: Type.Optional(Type.String()),
+    sources: Type.Optional(Type.Array(This)),
+    adapterData: Type.Optional(Type.Unknown()),
+    checksums: Type.Optional(Type.Array(Checksum)),
+  })
+);
 
 export const Capabilities = Type.Object({
   supportsConfigurationDoneRequest: Type.Optional(Type.Boolean()),
@@ -159,24 +169,106 @@ export const Capabilities = Type.Object({
   supportsSingleThreadExecutionRequests: Type.Optional(Type.Boolean()),
 });
 
-export const Source = Type.Recursive((This) =>
+export const Thread = Type.Object({
+  id: Type.Number(),
+  name: Type.String(),
+});
+
+export const Scope = Type.Object({
+  name: Type.String(),
+  presentationHint: Type.Optional(Type.String()),
+  variablesReference: Type.Number(),
+  namedVariables: Type.Optional(Type.Number()),
+  indexedVariables: Type.Optional(Type.Number()),
+  expensive: Type.Boolean(),
+  source: Type.Optional(Source),
+  line: Type.Optional(Type.Number()),
+  column: Type.Optional(Type.Number()),
+  endLine: Type.Optional(Type.Number()),
+  endColumn: Type.Optional(Type.Number()),
+});
+
+export const ValueFormat = Type.Object({
+  hex: Type.Optional(Type.Boolean()),
+});
+
+export const StackFrameFormat = Type.Composite([
+  ValueFormat,
   Type.Object({
-    name: Type.Optional(Type.String()),
-    path: Type.Optional(Type.String()),
-    sourceReference: Type.Optional(Type.Number()),
-    presentationHint: Type.Optional(
-      Type.Union([
-        Type.Literal("normal"),
-        Type.Literal("emphasize"),
-        Type.Literal("deemphasize"),
-      ]),
-    ),
-    origin: Type.Optional(Type.String()),
-    sources: Type.Optional(Type.Array(This)),
-    adapterData: Type.Optional(Type.Unknown()),
-    checksums: Type.Optional(Type.Array(Checksum)),
-  })
-);
+    parameters: Type.Optional(Type.Boolean()),
+    parameterTypes: Type.Optional(Type.Boolean()),
+    parameterNames: Type.Optional(Type.Boolean()),
+    parameterValues: Type.Optional(Type.Boolean()),
+    line: Type.Optional(Type.Boolean()),
+    module: Type.Optional(Type.Boolean()),
+    includeAll: Type.Optional(Type.Boolean()),
+  }),
+]);
+
+export const StackFrame = Type.Object({
+  id: Type.Number(),
+  name: Type.String(),
+  source: Type.Optional(Source),
+  line: Type.Number(),
+  column: Type.Number(),
+  endLine: Type.Optional(Type.Number()),
+  endColumn: Type.Optional(Type.Number()),
+  canRestart: Type.Optional(Type.Boolean()),
+  instructionPointerReference: Type.Optional(Type.String()),
+  moduleId: Type.Optional(Type.Union([Type.String(), Type.Number()])),
+  presentationHint: Type.Optional(
+    Type.Union([
+      Type.Literal("normal"),
+      Type.Literal("label"),
+      Type.Literal("subtle"),
+    ]),
+  ),
+});
+
+export const Breakpoint = Type.Object({
+  id: Type.Optional(Type.Number()),
+  verified: Type.Boolean(),
+  message: Type.Optional(Type.String()),
+  source: Type.Optional(Source),
+  line: Type.Optional(Type.Number()),
+  column: Type.Optional(Type.Number()),
+  endLine: Type.Optional(Type.Number()),
+  endColumn: Type.Optional(Type.Number()),
+  instructionReference: Type.Optional(Type.String()),
+  offset: Type.Optional(Type.Number()),
+  reason: Type.Optional(
+    Type.Union([
+      Type.Literal("pending"),
+      Type.Literal("failed"),
+    ]),
+  ),
+});
+
+// }}}
+
+// https://microsoft.github.io/debug-adapter-protocol/specification#requests
+// Requests {{{
+
+export const InitializeRequestArguments = Type.Object({
+  clientID: Type.Optional(Type.String()),
+  clientName: Type.Optional(Type.String()),
+  adapterID: Type.String(),
+  locale: Type.Optional(Type.String()),
+  linesStartAt1: Type.Optional(Type.Boolean()),
+  columnStartAt1: Type.Optional(Type.Boolean()),
+  pathFormat: Type.Optional(Type.String()),
+  supportsVariableType: Type.Optional(Type.Boolean()),
+  supportsVariablePaging: Type.Optional(Type.Boolean()),
+  supportsRunInTerminalRequest: Type.Optional(Type.Boolean()),
+  supportsMemoryReferences: Type.Optional(Type.Boolean()),
+  supportsProgressReporting: Type.Optional(Type.Boolean()),
+  supportsInvalidatedEvent: Type.Optional(Type.Boolean()),
+  supportsMemoryEvent: Type.Optional(Type.Boolean()),
+  supportsArgsCanBeInterpretedByShell: Type.Optional(Type.Boolean()),
+  supportsStartDebuggingRequest: Type.Optional(Type.Boolean()),
+});
+
+export const InitializeResponse = Capabilities;
 
 export const LaunchRequestArguments = Type.Object({
   noDebug: Type.Optional(Type.Boolean()),
@@ -187,38 +279,124 @@ export const AttachRequestArguments = Type.Object({
   __restart: Type.Optional(Type.Any()),
 });
 
-export const Output = Type.Object({
-  category: Type.Optional(Type.String()),
-  output: Type.String(),
-  group: Type.Optional(Type.Union([
-    Type.Literal("start"),
-    Type.Literal("startCollapsed"),
-    Type.Literal("end"),
-  ])),
-  variablesReference: Type.Optional(Type.Number()),
-  source: Type.Optional(Source),
-  line: Type.Optional(Type.Number()),
-  column: Type.Optional(Type.Number()),
-  data: Type.Optional(Type.Unknown()),
-});
-
-export const Stopped = Type.Object({
-  reason: Type.String(),
-  description: Type.Optional(Type.String()),
-  threadId: Type.Optional(Type.Number()),
-  preserveFocusHint: Type.Optional(Type.Boolean()),
-  text: Type.Optional(Type.String()),
-  allThreadsStopped: Type.Optional(Type.Boolean()),
-  hitBreakpointIds: Type.Optional(Type.Array(Type.Number())),
-});
-
-export const Thread = Type.Object({
-  id: Type.Number(),
-  name: Type.String(),
-});
-
 export const ThreadsResponse = Type.Object({
   threads: Type.Array(Thread),
 });
 
-export const Ignored = Type.Optional(Type.Unknown());
+export const ScopesArguments = Type.Object({
+  frameId: Type.Number(),
+});
+
+export const ScopesResponse = Type.Object({
+  scopes: Type.Array(Scope),
+});
+
+export const StackTraceArguments = Type.Object({
+  threadId: Type.Number(),
+  startFrame: Type.Optional(Type.Number()),
+  levels: Type.Optional(Type.Number()),
+  format: Type.Optional(StackFrameFormat),
+});
+
+export const StackTraceResponse = Type.Object({
+  stackFrames: Type.Array(StackFrame),
+  totalFrames: Type.Optional(Type.Number()),
+});
+
+export const RequestSpec = {
+  initialize: {
+    request: InitializeRequestArguments,
+    response: InitializeResponse,
+  },
+  launch: {
+    request: LaunchRequestArguments,
+    response: Ignored,
+  },
+  attach: {
+    request: AttachRequestArguments,
+    response: Ignored,
+  },
+  configurationDone: {
+    request: Ignored,
+    response: Ignored,
+  },
+  threads: {
+    request: Ignored,
+    response: ThreadsResponse,
+  },
+  scopes: {
+    request: ScopesArguments,
+    response: ScopesResponse,
+  },
+  stackTrace: {
+    request: StackTraceArguments,
+    response: StackTraceResponse,
+  },
+};
+
+// }}}
+
+// https://microsoft.github.io/debug-adapter-protocol/specification#events
+// Event {{{
+
+export const EventSpec = {
+  breakpoint: Type.Object({
+    reason: Type.String(),
+    breakpoint: Breakpoint,
+  }),
+  continued: Type.Object({
+    threadId: Type.Number(),
+    allThreadsContinued: Type.Optional(Type.Boolean()),
+  }),
+  exited: Type.Object({
+    exitCode: Type.Number(),
+  }),
+  initialized: Type.Object({}),
+  output: Type.Object({
+    category: Type.Optional(Type.String()),
+    output: Type.String(),
+    group: Type.Optional(Type.Union([
+      Type.Literal("start"),
+      Type.Literal("startCollapsed"),
+      Type.Literal("end"),
+    ])),
+    variablesReference: Type.Optional(Type.Number()),
+    source: Type.Optional(Source),
+    line: Type.Optional(Type.Number()),
+    column: Type.Optional(Type.Number()),
+    data: Type.Optional(Type.Unknown()),
+  }),
+  process: Type.Object({
+    name: Type.String(),
+    systemProcessId: Type.Optional(Type.Number()),
+    isLocalProcess: Type.Optional(Type.Boolean()),
+    startMethod: Type.Optional(
+      Type.Union([
+        Type.Literal("launch"),
+        Type.Literal("attach"),
+        Type.Literal("attachForSuspendedLaunch"),
+      ]),
+    ),
+    pointerSize: Type.Optional(Type.Number()),
+  }),
+  stopped: Type.Object({
+    reason: Type.String(),
+    description: Type.Optional(Type.String()),
+    threadId: Type.Optional(Type.Number()),
+    preserveFocusHint: Type.Optional(Type.Boolean()),
+    text: Type.Optional(Type.String()),
+    allThreadsStopped: Type.Optional(Type.Boolean()),
+    hitBreakpointIds: Type.Optional(Type.Array(Type.Number())),
+  }),
+  terminated: Type.Optional(
+    Type.Object({
+      restart: Type.Optional(Type.Unknown()),
+    }),
+  ),
+  thread: Type.Object({
+    reason: Type.String(),
+    threadId: Type.Number(),
+  }),
+};
+
+// }}}
