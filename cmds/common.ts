@@ -1,8 +1,9 @@
 import { ArgumentValue, ValidationError } from "../deps/cliffy/command.ts";
-import { Select } from "../deps/cliffy/prompt.ts";
 import { ReadBuffer, readLine } from "../utils/read.ts";
 import { ClientStub, makeClientStub } from "../dap/client-wrapper.ts";
 import { Client } from "../dap/client.ts";
+import { ListView } from "../tui/list-view.ts";
+import { run as runTui } from "../tui/index.ts";
 import {
   EventSpec as DapEventSpec,
   RequestSpec as DapRequestSpec,
@@ -97,12 +98,19 @@ async function locateSession(
     }
   }
 
-  const choice = await Select.prompt<string>({
-    message: "Pick a session",
-    options: [...availableSessions].map((name) => ({
-      value: name,
-    })),
-  });
+  return runTui<string>(async (ctx) => {
+    const sessions = [...availableSessions];
+    const listView = new ListView(sessions, ctx);
+    const controller = new AbortController();
 
-  return choice;
+    const result = new Promise<string>((resolve) => {
+      listView.once("itemSelected", (index) => {
+        resolve(sessions[index]);
+        controller.abort();
+      });
+    });
+
+    await listView.loop(controller.signal);
+    return result;
+  });
 }
