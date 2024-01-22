@@ -147,6 +147,14 @@ export const Cmd = new Command()
         stackFrameId: undefined,
       };
 
+      // Focus on the first thread
+      {
+        const threadsResponse = await dapClient.threads({});
+        if (threadsResponse.threads.length > 0) {
+          viewFocus.threadId = threadsResponse.threads[0].id;
+        }
+      }
+
       const broadcastRawEvent = (type: string, body: unknown) => {
         listeners.forEach((connection) => {
           connection.sendEvent(type, body).catch(() => {

@@ -1,7 +1,6 @@
 import { Command } from "../../deps/cliffy/command.ts";
 import { connectToServer } from "../common.ts";
 import { Select } from "../../deps/cliffy/prompt.ts";
-import { tty } from "../../deps/cliffy/tty.ts";
 
 export const Cmd = new Command()
   .name("threads")
