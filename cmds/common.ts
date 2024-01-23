@@ -100,6 +100,7 @@ async function locateSession(
 
   const controller = new AbortController();
   const listViewState = {
+    title: "Choose a session:",
     list: [...availableSessions],
     selectedIndex: 0,
     selectionChanged: controller.abort.bind(controller),
