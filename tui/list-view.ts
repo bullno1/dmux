@@ -1,5 +1,10 @@
 import { Tui } from "./index.ts";
-import { clearScreen, cursorHide, cursorTo } from "../deps/cliffy/ansi.ts";
+import {
+  clearScreen,
+  colors,
+  cursorHide,
+  cursorTo,
+} from "../deps/cliffy/ansi.ts";
 
 export interface State {
   title: string;
@@ -24,8 +29,12 @@ export function ListView(state: State): Tui {
       renderCtx.write(state.title);
       for (let index = 0; index < state.list.length; ++index) {
         renderCtx.write(cursorTo(1, index + 2));
-        const selector = activeIndex === index ? ">" : " ";
-        renderCtx.write(`${selector} ${state.list[index]}`);
+        renderCtx.write(index === activeIndex ? "> " : "  ");
+
+        const item = state.list[index];
+        renderCtx.write(
+          index === state.selectedIndex ? colors.underline(item) : item,
+        );
       }
       renderCtx.endRender();
 
