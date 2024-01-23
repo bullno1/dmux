@@ -251,6 +251,18 @@ export const VariablePresentationHint = Type.Object({
   lazy: Type.Optional(Type.Boolean()),
 });
 
+export const Variable = Type.Object({
+  name: Type.String(),
+  value: Type.String(),
+  type: Type.Optional(Type.String()),
+  presentationHint: Type.Optional(VariablePresentationHint),
+  evaluateName: Type.Optional(Type.String()),
+  variablesReference: Type.Number(),
+  namedVariables: Type.Optional(Type.Number()),
+  indexedVariables: Type.Optional(Type.Number()),
+  memoryReference: Type.Optional(Type.String()),
+});
+
 // }}}
 
 // https://microsoft.github.io/debug-adapter-protocol/specification#requests
@@ -288,14 +300,6 @@ export const AttachRequestArguments = Type.Object({
 
 export const ThreadsResponse = Type.Object({
   threads: Type.Array(Thread),
-});
-
-export const ScopesArguments = Type.Object({
-  frameId: Type.Number(),
-});
-
-export const ScopesResponse = Type.Object({
-  scopes: Type.Array(Scope),
 });
 
 export const StackTraceArguments = Type.Object({
@@ -337,6 +341,26 @@ export const EvaluateResponse = Type.Object({
   memoryReference: Type.Optional(Type.String()),
 });
 
+export const ScopesArguments = Type.Object({
+  frameId: Type.Number(),
+});
+
+export const ScopesResponse = Type.Object({
+  scopes: Type.Array(Scope),
+});
+
+export const VariablesArguments = Type.Object({
+  variablesReference: Type.Number(),
+  filter: Type.Optional(Type.Union([Type.Literal('indexed'), Type.Literal('named')])),
+  start: Type.Optional(Type.Number()),
+  count: Type.Optional(Type.Number()),
+  format: Type.Optional(ValueFormat),
+});
+
+export const VariablesResponse = Type.Object({
+  variables: Type.Array(Variable),
+});
+
 export const RequestSpec = {
   initialize: {
     request: InitializeRequestArguments,
@@ -373,6 +397,10 @@ export const RequestSpec = {
   evaluate: {
     request: EvaluateArguments,
     response: EvaluateResponse,
+  },
+  variables: {
+    request: VariablesArguments,
+    response: VariablesResponse,
   },
 };
 
