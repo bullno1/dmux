@@ -31,9 +31,9 @@ export async function* abortableAsyncIterable<T>(
       }
     }
   } catch (e) {
-    if (iterator?.throw) { await iterator.throw(e); }
+    iterator.throw?.();
     throw e;
   } finally {
-    if (iterator?.return) { await iterator.return(); }
+    iterator.return?.();
   }
 }

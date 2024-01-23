@@ -3,7 +3,7 @@ import { ReadBuffer, readLine } from "../utils/read.ts";
 import { ClientStub, makeClientStub } from "../dap/client-wrapper.ts";
 import { Client } from "../dap/client.ts";
 import { ListView } from "../tui/list-view.ts";
-import { run as runTui } from "../tui/index.ts";
+import { makeEventSource, run as runTui } from "../tui/index.ts";
 import {
   EventSpec as DapEventSpec,
   RequestSpec as DapRequestSpec,
@@ -98,19 +98,14 @@ async function locateSession(
     }
   }
 
-  return runTui<string>(async (ctx) => {
-    const sessions = [...availableSessions];
-    const listView = new ListView(sessions, ctx);
-    const controller = new AbortController();
+  const controller = new AbortController();
+  const listViewState = {
+    list: [...availableSessions],
+    selectedIndex: 0,
+    selectionChanged: controller.abort.bind(controller),
+  };
 
-    const result = new Promise<string>((resolve) => {
-      listView.once("itemSelected", (index) => {
-        resolve(sessions[index]);
-        controller.abort();
-      });
-    });
+  await runTui(ListView(listViewState), makeEventSource(controller.signal)[0]);
 
-    await listView.loop(controller.signal);
-    return result;
-  });
+  return listViewState.list[listViewState.selectedIndex];
 }

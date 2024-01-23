@@ -15,4 +15,5 @@ const cmd = new Command()
 
 if (import.meta.main) {
   await cmd.parse(Deno.args);
+  Deno.exit(0);
 }
