@@ -3,7 +3,7 @@ import { connectToServer } from "./common.ts";
 
 export const Cmd = new Command()
   .name("stacktrace")
-  .description("Stacktrace for the current thread.")
+  .description("View source.")
   .arguments("<source-ref:number>")
   .option("--session-name <sessionName:string>", "Session name.")
   .action(async ({ sessionName }, sourceRef) => {
