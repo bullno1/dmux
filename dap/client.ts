@@ -2,7 +2,7 @@ import { MessageReader, writeMessage } from "./io.ts";
 import { Event as EventSchema, Response as ResponseSchema } from "./schema.ts";
 import { Static } from "../deps/typebox.ts";
 import { EventEmitter } from "../deps/event_emitter.ts";
-import { waitForAbort, Aborted } from "../utils/abort.ts";
+import { Aborted, waitForAbort } from "../utils/abort.ts";
 
 interface Deferred<T> {
   resolve(result: T): void;

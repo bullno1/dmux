@@ -6,7 +6,7 @@ export const Cmd = new Command()
   .description("Enter command directly.")
   .option("--session-name <sessionName:string>", "Session name.")
   .option("--context <context:string>", "Evaluation context.", {
-    default: 'repl',
+    default: "repl",
   })
   .action(async ({ sessionName, context }) => {
     const [_client, stub] = await connectToServer(sessionName);

@@ -152,7 +152,8 @@ function wrapRequest<
 
     if (!response.success) {
       throw new InvocationError(
-        response.message || "Unknown error", response.body?.error
+        response.message || "Unknown error",
+        response.body?.error,
       );
     }
 

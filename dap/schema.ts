@@ -328,13 +328,13 @@ export const EvaluateArguments = Type.Object({
 });
 
 export const EvaluateResponse = Type.Object({
-    result: Type.String(),
-    type: Type.Optional(Type.String()),
-    presentationHint: Type.Optional(VariablePresentationHint),
-    variablesReference: Type.Number(),
-    namedVariables: Type.Optional(Type.Number()),
-    indexedVariables: Type.Optional(Type.Number()),
-    memoryReference: Type.Optional(Type.String()),
+  result: Type.String(),
+  type: Type.Optional(Type.String()),
+  presentationHint: Type.Optional(VariablePresentationHint),
+  variablesReference: Type.Number(),
+  namedVariables: Type.Optional(Type.Number()),
+  indexedVariables: Type.Optional(Type.Number()),
+  memoryReference: Type.Optional(Type.String()),
 });
 
 export const RequestSpec = {

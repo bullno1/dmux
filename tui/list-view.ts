@@ -5,7 +5,7 @@ export interface State {
   title: string;
   list: string[];
   selectedIndex: number;
-  selectionChanged?: () => void;
+  selectionChanged?: (index: number) => Promise<void> | void;
 }
 
 export function ListView(state: State): Tui {
@@ -42,7 +42,7 @@ export function ListView(state: State): Tui {
               activeIndex += 1;
             } else if (event.value.key === "return") {
               state.selectedIndex = activeIndex;
-              if (state?.selectionChanged) state.selectionChanged();
+              await state.selectionChanged?.(activeIndex);
             }
           }
           continue;
