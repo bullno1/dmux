@@ -2,7 +2,7 @@ import { Command } from "../../deps/cliffy/command.ts";
 import { connectToServer } from "../common.ts";
 import { StackFrame } from "../../dap/schema.ts";
 import { Static } from "../../deps/typebox.ts";
-import { run as runTui } from "../../tui/index.ts";
+import { run as runTui, makeEventSource } from "../../tui/index.ts";
 import { ListView } from "../../tui/list-view.ts";
 
 export const Cmd = new Command()
@@ -12,20 +12,30 @@ export const Cmd = new Command()
   .action(async ({ sessionName }) => {
     const [_client, stub] = await connectToServer(sessionName);
 
+    await stub["dmux/listen"]({});
+
     const info = await stub["dmux/info"]({});
-    const threadId = info.viewFocus.threadId;
+    let threadId = info.viewFocus.threadId;
     let stackFrames: Static<typeof StackFrame>[] = [];
 
-    if (threadId) {
-      const stackTraceResponse = await stub.stackTrace({
-        threadId: threadId,
-        format: {
-          includeAll: true,
-        },
-      });
+    const [source, sink] = makeEventSource();
 
-      stackFrames = stackTraceResponse.stackFrames;
-    }
+    const refresh = async () => {
+      if (threadId !== undefined) {
+        const stackTraceResponse = await stub.stackTrace({
+          threadId: threadId,
+          format: {
+            includeAll: true,
+          },
+        });
+
+        stackFrames = stackTraceResponse.stackFrames;
+        stackEntryList.length = 0;
+        formatStackTrace(stackEntryList, stackFrames);
+
+        sink({ type: "refresh" });
+      }
+    };
 
     const stackEntryList: string[] = [];
     formatStackTrace(stackEntryList, stackFrames);
@@ -36,7 +46,19 @@ export const Cmd = new Command()
       list: stackEntryList,
     };
 
-    await runTui(ListView(listViewState));
+    stub.on("dmux/focus", (event) => {
+      if (event.focus.threadId !== null && event.focus.threadId !== threadId) {
+        threadId = event.focus.threadId;
+        refresh();
+      }
+    });
+
+    stub.on("stopped", (_event) => {
+      refresh();
+    });
+
+    await refresh();
+    await runTui(ListView(listViewState), source);
   });
 
 function formatStackTrace(output: string[], frames: Static<typeof StackFrame>[]) {
