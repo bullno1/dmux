@@ -170,6 +170,15 @@ export const Cmd = new Command()
       const broadcastEvent: EventSender<typeof DmuxEventSpec> =
         broadcastRawEvent;
 
+      dapClient.on("stopped", (event) => {
+        // TODO: Handle focus on a per-thread basis
+        if (event.threadId !== undefined) {
+          viewFocus.threadId = event.threadId;
+          viewFocus.stackFrameId = undefined;
+          broadcastEvent("dmux/focus", { focus: viewFocus });
+        }
+      });
+
       const requestHandlers: ServerStub<typeof DmuxRequestSpec> = {
         "dmux/info": (_client, _args) =>
           Promise.resolve({
