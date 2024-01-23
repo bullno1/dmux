@@ -12,7 +12,6 @@ export const Cmd = new Command()
   .action(async ({ sessionName }) => {
     const [_client, stub] = await connectToServer(sessionName);
 
-    await stub["dmux/listen"]({});
     const info = await stub["dmux/info"]({});
     const threadId = info.viewFocus.threadId;
     let stackFrames: Static<typeof StackFrame>[] = [];
@@ -26,7 +25,6 @@ export const Cmd = new Command()
       });
 
       stackFrames = stackTraceResponse.stackFrames;
-      console.log(stackFrames);
     }
 
     const stackEntryList: string[] = [];

@@ -244,6 +244,13 @@ export const Breakpoint = Type.Object({
   ),
 });
 
+export const VariablePresentationHint = Type.Object({
+  kind: Type.Optional(Type.String()),
+  attributes: Type.Optional(Type.Array(Type.String())),
+  visibility: Type.Optional(Type.String()),
+  lazy: Type.Optional(Type.Boolean()),
+});
+
 // }}}
 
 // https://microsoft.github.io/debug-adapter-protocol/specification#requests
@@ -313,6 +320,23 @@ export const SourceResponse = Type.Object({
   mimeType: Type.Optional(Type.String()),
 });
 
+export const EvaluateArguments = Type.Object({
+  expression: Type.String(),
+  frameId: Type.Optional(Type.Number()),
+  context: Type.Optional(Type.String()),
+  format: Type.Optional(ValueFormat),
+});
+
+export const EvaluateResponse = Type.Object({
+    result: Type.String(),
+    type: Type.Optional(Type.String()),
+    presentationHint: Type.Optional(VariablePresentationHint),
+    variablesReference: Type.Number(),
+    namedVariables: Type.Optional(Type.Number()),
+    indexedVariables: Type.Optional(Type.Number()),
+    memoryReference: Type.Optional(Type.String()),
+});
+
 export const RequestSpec = {
   initialize: {
     request: InitializeRequestArguments,
@@ -345,6 +369,10 @@ export const RequestSpec = {
   source: {
     request: SourceArguments,
     response: SourceResponse,
+  },
+  evaluate: {
+    request: EvaluateArguments,
+    response: EvaluateResponse,
   },
 };
 

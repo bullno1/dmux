@@ -3,6 +3,7 @@ import { Cmd as ServerCmd } from "./cmds/server.ts";
 import { Cmd as ViewCmd } from "./cmds/view/index.ts";
 import { Cmd as InfoCmd } from "./cmds/info.ts";
 import { Cmd as SourceCmd } from "./cmds/source.ts";
+import { Cmd as ReplCmd } from "./cmds/repl.ts";
 
 const cmd = new Command()
   .name("dmux")
@@ -13,6 +14,7 @@ const cmd = new Command()
   .command("server", ServerCmd)
   .command("view", ViewCmd)
   .command("info", InfoCmd)
+  .command("repl", ReplCmd)
   .command("source", SourceCmd);
 
 if (import.meta.main) {
