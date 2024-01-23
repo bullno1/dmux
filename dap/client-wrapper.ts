@@ -151,7 +151,9 @@ function wrapRequest<
     const response = await client.sendRequest(command, args);
 
     if (!response.success) {
-      throw new InvocationError(response.message, response.body?.error);
+      throw new InvocationError(
+        response.message || "Unknown error", response.body?.error
+      );
     }
 
     if (!responseChecker.Check(response.body)) {

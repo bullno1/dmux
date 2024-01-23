@@ -1,5 +1,6 @@
 import { Command } from "../../deps/cliffy/command.ts";
 import { Cmd as ThreadsCmd } from "./threads.ts";
+import { Cmd as StackTraceCmd } from "./stacktrace.ts";
 
 export const Cmd = new Command()
   .name("view")
@@ -7,4 +8,5 @@ export const Cmd = new Command()
   .action(function () {
     this.showHelp();
   })
-  .command("threads", ThreadsCmd);
+  .command("threads", ThreadsCmd)
+  .command("stacktrace", StackTraceCmd);

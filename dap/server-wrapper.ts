@@ -59,7 +59,10 @@ export function makeReverseProxy(client: Client): RequestHandler {
     if (response.success) {
       return response.body;
     } else {
-      throw new InvocationError(response.message, response?.body?.error);
+      throw new InvocationError(
+        response.message || "Unknown error",
+        response?.body?.error
+      );
     }
   };
 }

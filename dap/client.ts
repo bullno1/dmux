@@ -2,7 +2,7 @@ import { MessageReader, writeMessage } from "./io.ts";
 import { Event as EventSchema, Response as ResponseSchema } from "./schema.ts";
 import { Static } from "../deps/typebox.ts";
 import { EventEmitter } from "../deps/event_emitter.ts";
-import { waitForAbort } from "../utils/abort.ts";
+import { waitForAbort, Aborted } from "../utils/abort.ts";
 
 interface Deferred<T> {
   resolve(result: T): void;
@@ -83,13 +83,13 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   private async readLoop(abortSignal: AbortSignal): Promise<void> {
-    const abortPromise = waitForAbort(abortSignal, null);
+    const abortPromise = waitForAbort(abortSignal);
     while (!abortSignal.aborted) {
       const message = await Promise.race([
         this.messageReader.read(),
         abortPromise,
       ]);
-      if (message === null) break;
+      if (message === Aborted) break;
 
       switch (message.type) {
         case "event":

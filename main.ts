@@ -2,6 +2,7 @@ import { Command } from "./deps/cliffy/command.ts";
 import { Cmd as ServerCmd } from "./cmds/server.ts";
 import { Cmd as ViewCmd } from "./cmds/view/index.ts";
 import { Cmd as InfoCmd } from "./cmds/info.ts";
+import { Cmd as SourceCmd } from "./cmds/source.ts";
 
 const cmd = new Command()
   .name("dmux")
@@ -11,7 +12,8 @@ const cmd = new Command()
   })
   .command("server", ServerCmd)
   .command("view", ViewCmd)
-  .command("info", InfoCmd);
+  .command("info", InfoCmd)
+  .command("source", SourceCmd);
 
 if (import.meta.main) {
   await cmd.parse(Deno.args);

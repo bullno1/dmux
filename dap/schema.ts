@@ -55,7 +55,7 @@ export const Response = Type.Intersect([
     }),
     Type.Object({
       success: Type.Literal(false),
-      message: Type.String(),
+      message: Type.Optional(Type.String()),
       body: Type.Optional(Type.Object({
         error: Type.Optional(ErrorMessage),
       })),
@@ -303,6 +303,16 @@ export const StackTraceResponse = Type.Object({
   totalFrames: Type.Optional(Type.Number()),
 });
 
+export const SourceArguments = Type.Object({
+  source: Type.Optional(Source),
+  sourceReference: Type.Number(),
+});
+
+export const SourceResponse = Type.Object({
+  content: Type.String(),
+  mimeType: Type.Optional(Type.String()),
+});
+
 export const RequestSpec = {
   initialize: {
     request: InitializeRequestArguments,
@@ -331,6 +341,10 @@ export const RequestSpec = {
   stackTrace: {
     request: StackTraceArguments,
     response: StackTraceResponse,
+  },
+  source: {
+    request: SourceArguments,
+    response: SourceResponse,
   },
 };
 
