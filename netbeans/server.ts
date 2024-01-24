@@ -14,6 +14,7 @@ export interface Event {
 }
 
 export interface ClientConnection {
+  readonly id: number;
   command(bufId: number, name: string, args: MessageArg[]): Promise<void>;
   call(bufId: number, name: string, args: MessageArg[]): Promise<MessageArg[]>;
   on(event: "event", handler: (event: Event) => void): void;
@@ -83,6 +84,8 @@ async function handleClient(
   const emitter = new EventEmitter<{ event(event: Event): void }>();
 
   const connectionImpl: ClientConnection = {
+    id: connection.rid,
+
     command: (bufId, name, args) => {
       return writeMessage(writer, {
         type: "command",

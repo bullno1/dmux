@@ -5,7 +5,6 @@ import { runServer, ServerHandler } from "../netbeans/server.ts";
 import { CommandSpec, FunctionSpec, EventSpec } from "../netbeans/schema.ts";
 import { ClientStub, makeClientStub } from "../netbeans/wrapper.ts";
 import { getLogger } from "../logging.ts";
-import { ClientConnection } from "../netbeans/server.ts";
 
 type Client = ClientStub<
   typeof CommandSpec,
@@ -13,13 +12,15 @@ type Client = ClientStub<
   typeof EventSpec
 >;
 
+const SourceBufferNumber = 1;
+
 export const Cmd = new Command()
   .name("vim")
   .description("Vim netbeans server.")
   .option("--session-name <sessionName:string>", "Session name.")
   .action(async ({ sessionName }) => {
     sessionName = await locateSession(sessionName);
-    const [rawClient, stub] = await connectToServer(sessionName);
+    const [rawClient, dapClient] = await connectToServer(sessionName);
 
     const listener = Deno.listen({
       transport: "tcp",
@@ -55,23 +56,62 @@ export const Cmd = new Command()
 
       logger.info(`Run \`vim -nb=${sessionFile}\` to connect`);
 
-      const clients = new Map<ClientConnection, Client>();
+      const clients = new Map<number, Client>();
+
+      const setupClient = async (client: Client) => {
+          await new Promise<void>((resolve) => {
+            client.once("startupDone", () => resolve());
+          });
+
+        await client.create(SourceBufferNumber, {});
+        await client.setVisible(SourceBufferNumber, { visible: "F" });
+      };
+
+      await dapClient["dmux/listen"]({});
+
+      dapClient.on("dmux/focus", async (event) => {
+        if (event.focus.stackFrameId === undefined || event.focus.threadId === undefined) { return; }
+
+        const stackTraceResult = await dapClient.stackTrace({
+          threadId: event.focus.threadId,
+        });
+
+        for (const frame of stackTraceResult.stackFrames) {
+          if (frame.id === event.focus.stackFrameId) {
+            if (frame.source?.path !== undefined) {
+              for (const client of clients.values()) {
+                await client.editFile(
+                  SourceBufferNumber,
+                  { pathName: frame.source?.path },
+                );
+                await client.setVisible(SourceBufferNumber, { visible: "T" });
+              }
+            }
+
+            break;
+          }
+        }
+      });
+
       const handler: ServerHandler = {
         onConnect: (connection, authPassword) => {
-          logger.info(authPassword, password);
           const authorized = authPassword === password;
 
           if (authorized) {
-            clients.set(
-              connection,
-              makeClientStub(connection, CommandSpec, FunctionSpec, EventSpec)
+            const client = makeClientStub(
+              connection, CommandSpec, FunctionSpec, EventSpec
+            );
+
+            setupClient(client).then(
+              () => clients.set(connection.id, client),
+              (e) => logger.error({ client: connection.id }, e)
             );
           }
 
           return Promise.resolve(authorized);
         },
         onDisconnect: (connection) => {
-          clients.delete(connection);
+          clients.delete(connection.id);
           return Promise.resolve();
         },
         onShutdown: () => {
