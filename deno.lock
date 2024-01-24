@@ -44,6 +44,8 @@
     "https://deno.land/std@0.212.0/bytes/mod.ts": "15cfea60a44d8141780d24aa65c204af6bd74ac3542ebf26d3c4c151adc62623",
     "https://deno.land/std@0.212.0/bytes/repeat.ts": "0f8ae07ee9e7335208da2cc8a0fd3e0b17adb99fc0c68b105ba73e71b8f4aaad",
     "https://deno.land/std@0.212.0/bytes/starts_with.ts": "1e864e216867b1c9f5a4bc824806df42bf71f2532dd692438929cb1b7e0dc548",
+    "https://deno.land/std@0.212.0/encoding/_util.ts": "beacef316c1255da9bc8e95afb1fa56ed69baef919c88dc06ae6cb7a6103d376",
+    "https://deno.land/std@0.212.0/encoding/base64.ts": "0ec6d6e6b68fc38f6396277e5184bcd47c1a9db0222fd0b563487eb67e352741",
     "https://deno.land/x/cliffy@v1.0.0-rc.3/_utils/distance.ts": "02af166952c7c358ac83beae397aa2fbca4ad630aecfcd38d92edb1ea429f004",
     "https://deno.land/x/cliffy@v1.0.0-rc.3/ansi/ansi.ts": "481e382126922ff686dd664f4bae6bc44df44bc5ed883c0f5f8a8b3776e5a983",
     "https://deno.land/x/cliffy@v1.0.0-rc.3/ansi/ansi_escapes.ts": "193b3c3a4e520274bd8322ca4cab1c3ce38070bed1898cb2ade12a585dddd7c9",

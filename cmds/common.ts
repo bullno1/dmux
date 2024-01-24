@@ -57,7 +57,7 @@ export async function connectToServer(
   return [client, stub];
 }
 
-async function locateSession(
+export async function locateSession(
   sessionNameFromCli?: string,
 ): Promise<string> {
   if (sessionNameFromCli !== undefined) {
