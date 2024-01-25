@@ -171,6 +171,7 @@ function makeEventStub<T extends EventSpec>(
       return;
     }
 
+    logger.debug("Event", message.name, message.bufId, event);
     emitter.emit(message.name, message.bufId, event);
   });
 
@@ -188,7 +189,7 @@ function makeEventTable<T extends EventSpec>(
     [key, spec],
   ) => {
     const checker = TypeCompiler.Compile(spec);
-    const keys = Object.keys(spec);
+    const keys = Object.keys(spec.properties);
 
     return [key, { checker, keys }] as const;
   });

@@ -49,6 +49,15 @@ export const EventSpec = {
   keyCommand: Type.Object({
     keyName: Type.String(),
   }),
-  startupDone: Type.Object({
+  version: Type.Object({
+    version: Type.String(),
+  }),
+  startupDone: Type.Object({}),
+  killed: Type.Object({}),
+  disconnect: Type.Object({}),
+  fileOpened: Type.Object({
+    pathName: Type.String(),
+    open: Type.Boolean(),
+    modified: Type.Boolean(),
   }),
 };
