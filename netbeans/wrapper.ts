@@ -162,7 +162,7 @@ function makeEventStub<T extends EventSpec>(
       return;
     }
 
-    const event: Record<string, number | string> = {};
+    const event: Record<string, MessageArg> = {};
     eventInfo.keys.forEach((key, index) => event[key] = message.args[index]);
 
     if (!eventInfo.checker.Check(event)) {

@@ -64,7 +64,7 @@ export const Cmd = new Command()
           });
 
         await client.create(SourceBufferNumber, {});
-        await client.setVisible(SourceBufferNumber, { visible: "F" });
+        await client.setVisible(SourceBufferNumber, { visible: false });
       };
 
       await dapClient["dmux/listen"]({});
@@ -84,7 +84,7 @@ export const Cmd = new Command()
                   SourceBufferNumber,
                   { pathName: frame.source?.path },
                 );
-                await client.setVisible(SourceBufferNumber, { visible: "T" });
+                await client.setVisible(SourceBufferNumber, { visible: true });
               }
             }
 

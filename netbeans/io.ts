@@ -12,7 +12,8 @@ export type Message =
   | Disconnect
   | Detach;
 
-export type MessageArg = string | number;
+export type MessageArg = string | number | boolean | Color;
+export type Color = { color: string | number };
 
 export type Command = {
   type: "command";
@@ -107,7 +108,7 @@ export async function writeMessage(
 const CommandRegex = /^(?<bufId>\d+):(?<name>[^!]*)!(?<seqNo>\d+)$/;
 const FunctionCallRegex = /^(?<bufId>\d+):(?<name>[^\/]*)\/(?<seqNo>\d+)$/;
 const EventRegex = /^(?<bufId>\d+):(?<name>[^=]*)=(?<seqNo>\d+)$/;
-const ReplyRegex = /^(?<seqNo>\d+)$/;
+const NumberRegex = /^(?<seqNo>\d+)$/;
 
 export class MessageReader {
   private readBuf = new ReadBuffer();
@@ -165,7 +166,7 @@ export class MessageReader {
             };
           }
 
-          match = firstPart.match(ReplyRegex);
+          match = firstPart.match(NumberRegex);
           if (match !== null) {
             return {
               type: "reply",
@@ -234,26 +235,36 @@ function findSplitPos(str: string): number {
   }
 }
 
-function parseString(str: string): string {
-  const result = JSON.parse(str);
-  if (typeof result !== "string") {
-    throw new ProtocolError("Expecting string, got " + str);
-  }
-
-  return result;
-}
-
 function parseArgs(args: string[]): MessageArg[] {
   return args.map((arg) => {
-    const result = JSON.parse(arg);
-    const type = typeof result;
-    if (type !== "string" && type !== "number") {
-      throw new ProtocolError("Expecting argument, got " + arg);
+    if (arg.charCodeAt(0) === Quote) {
+      const str = JSON.parse(arg);
+      if (typeof str !== "string") {
+        throw new ProtocolError(`Invalid string: '${arg}'`);
+      }
+      return str;
+    } else if (arg === "T") {
+      return true;
+    } else if (arg === "F") {
+      return false;
+    } else if (arg.match(NumberRegex)) {
+      return parseInt(arg);
+    } else {
+      return { color: arg };
     }
-    return result;
   });
 }
 
 function encodeArgs(args: MessageArg[]): string {
-  return args.map((arg) => JSON.stringify(arg)).join(" ");
+  return args.map((arg) => {
+    if (typeof arg === "boolean") {
+      return arg ? "T" : "F";
+    } else if (typeof arg === "number") {
+      return arg.toString();
+    } else if (typeof arg === "string") {
+      return JSON.stringify(arg);
+    } else {
+      return arg.color;
+    }
+  }).join(" ");
 }

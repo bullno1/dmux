@@ -2,13 +2,17 @@ import { Type } from "../deps/typebox.ts";
 
 // Reference: https://vimhelp.org/netbeans.txt.html
 
-const Bool = Type.Union([Type.Literal("T"), Type.Literal("F")]);
+export const Offset = Type.Union([Type.Number(), Type.String()]);
+export const Color = Type.Object({
+  color: Type.Union([Type.Number(), Type.String()])
+});
 
+// https://vimhelp.org/netbeans.txt.html#nb-commands
 export const CommandSpec = {
   addAnno: Type.Object({
     serNum: Type.Number(),
     typeNum: Type.Number(),
-    off: Type.Union([Type.Number(), Type.String()]),
+    off: Offset,
     len: Type.Number(),
   }),
   create: Type.Object({
@@ -18,17 +22,18 @@ export const CommandSpec = {
     typeName: Type.String(),
     tooltip: Type.String(),
     glyphFile: Type.String(),
-    fg: Type.String(),
-    bg: Type.String(),
+    fg: Color,
+    bg: Color,
   }),
   editFile: Type.Object({
     pathName: Type.String(),
   }),
   setVisible: Type.Object({
-    visible: Bool,
+    visible: Type.Boolean(),
   }),
 };
 
+// https://vimhelp.org/netbeans.txt.html#nb-functions
 export const FunctionSpec = {
   getAnno: {
     request: Type.Object({
@@ -39,6 +44,7 @@ export const FunctionSpec = {
   }
 };
 
+// https://vimhelp.org/netbeans.txt.html#nb-events
 export const EventSpec = {
   keyCommand: Type.Object({
     keyName: Type.String(),
