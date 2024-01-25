@@ -113,7 +113,7 @@ function makeEventStub<T extends EventSpec>(
 
     if (!checker.Check(message.body)) {
       const errors = checker.Errors(message.body);
-      logger.warning("Invalid event", message.event, [...errors]);
+      logger.warning("Invalid event", message.event, [...errors], message.body);
       return;
     }
 

@@ -460,11 +460,12 @@ export const EventSpec = {
     allThreadsStopped: Type.Optional(Type.Boolean()),
     hitBreakpointIds: Type.Optional(Type.Array(Type.Number())),
   }),
-  terminated: Type.Optional(
+  terminated: Type.Union([
     Type.Object({
       restart: Type.Optional(Type.Unknown()),
     }),
-  ),
+    Type.Undefined(),
+  ]),
   thread: Type.Object({
     reason: Type.String(),
     threadId: Type.Number(),

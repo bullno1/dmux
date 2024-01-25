@@ -19,12 +19,12 @@ const ExecAnnoSerNum = 1;
 const AnnoTypes: (Static<typeof CommandSpec.defineAnnoType>)[] = [
   {
     typeNum: 1,
-    typeName: 'exec',
-    tooltip: '',
-    glyphFile: '>>',
-    fg: { color: 'White' },
-    bg: { color: 'Red' },
-  }
+    typeName: "exec",
+    tooltip: "",
+    glyphFile: ">>",
+    fg: { color: "White" },
+    bg: { color: "Red" },
+  },
 ];
 
 export const Cmd = new Command()
