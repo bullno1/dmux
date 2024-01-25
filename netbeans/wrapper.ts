@@ -1,4 +1,4 @@
-import { Static, TObject, TypeCompiler, TypeCheck } from "../deps/typebox.ts";
+import { Static, TObject, TypeCheck, TypeCompiler } from "../deps/typebox.ts";
 import { ClientConnection } from "./server.ts";
 import { EventEmitter } from "../deps/event_emitter.ts";
 import { MessageArg, ProtocolError } from "./io.ts";
@@ -14,7 +14,10 @@ export type CommandStub<T extends CommandSpec> = {
   [command in keyof T]: WrappedCommand<T[command]>;
 };
 
-type WrappedCommand<T extends TObject> = (bufId: number, args: Static<T>) => Promise<void>;
+type WrappedCommand<T extends TObject> = (
+  bufId: number,
+  args: Static<T>,
+) => Promise<void>;
 
 export type FunctionSpec<
   TRequest extends TObject = TObject,
@@ -23,11 +26,11 @@ export type FunctionSpec<
   [request: string]: {
     request: TRequest;
     response: TResponse;
-  },
+  };
 };
 
 export type FunctionStub<T extends FunctionSpec> = {
-  [fn in keyof T]: WrappedFunction<T[fn]['request'], T[fn]['response']>;
+  [fn in keyof T]: WrappedFunction<T[fn]["request"], T[fn]["response"]>;
 };
 
 type WrappedFunction<
@@ -56,8 +59,10 @@ export type EventStub<T extends EventSpec> = {
   ): void;
 };
 
-type EventListener<T extends TObject> =
-  (bufId: number, event: Static<T>) => void;
+type EventListener<T extends TObject> = (
+  bufId: number,
+  event: Static<T>,
+) => void;
 
 export type ClientStub<
   TCommand extends CommandSpec,
@@ -89,7 +94,7 @@ function makeCommandStub<T extends CommandSpec>(
   const cmdPairs = Object.entries(spec).map(([commandName, spec]) => {
     const wrapper = (bufId: number, args: Static<typeof spec>) => {
       const argArray = Object.keys(spec.properties).map(
-        (argName) => args[argName]
+        (argName) => args[argName],
       ) as MessageArg[];
 
       return client.command(bufId, commandName, argArray);
@@ -109,10 +114,10 @@ export function makeFunctionStub<T extends FunctionSpec>(
     const responseChecker = TypeCompiler.Compile(spec.response);
     const wrapper = async (
       bufId: number,
-      args: Static<typeof spec['request']>
+      args: Static<typeof spec["request"]>,
     ) => {
       const argArray = Object.keys(spec.request.properties).map(
-        (argName) => args[argName]
+        (argName) => args[argName],
       ) as MessageArg[];
 
       const responseArray = await client.call(bufId, fnName, argArray);

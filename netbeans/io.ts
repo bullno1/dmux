@@ -12,8 +12,9 @@ export type Message =
   | Disconnect
   | Detach;
 
-export type MessageArg = string | number | boolean | Color;
+export type MessageArg = string | number | boolean | Color | LnumCol;
 export type Color = { color: string | number };
+export type LnumCol = { lnumCol: [number, number] };
 
 export type Command = {
   type: "command";
@@ -176,9 +177,9 @@ export class MessageReader {
           }
 
           throw new ProtocolError("Could not parse: " + firstPart);
-      } catch (e) {
-        throw new ProtocolError(`Could not parse '${line}'`, { cause: e });
-      }
+        } catch (e) {
+          throw new ProtocolError(`Could not parse '${line}'`, { cause: e });
+        }
     }
   }
 }
@@ -235,21 +236,31 @@ function findSplitPos(str: string): number {
   }
 }
 
+const LnumColRegex = /^(?<lnum>\d+)\/(?<col>\d+)$/;
+
 function parseArgs(args: string[]): MessageArg[] {
   return args.map((arg) => {
+    let match;
     if (arg.charCodeAt(0) === Quote) {
       return arg.slice(1, arg.length - 1)
-        .replaceAll('\\n', '\n')
-        .replaceAll('\\t', '\t')
-        .replaceAll('\\r', '\r')
+        .replaceAll("\\n", "\n")
+        .replaceAll("\\t", "\t")
+        .replaceAll("\\r", "\r")
         .replaceAll('\\"', '"')
-        .replaceAll('\\\\', '\\');
+        .replaceAll("\\\\", "\\");
     } else if (arg === "T") {
       return true;
     } else if (arg === "F") {
       return false;
     } else if (arg.match(NumberRegex)) {
       return parseInt(arg);
+    } else if ((match = arg.match(LnumColRegex)) !== null) {
+      return {
+        lnumCol: [
+          parseInt(match.groups!["lnum"]),
+          parseInt(match.groups!["col"]),
+        ],
+      };
     } else {
       return { color: arg };
     }
@@ -264,8 +275,10 @@ function encodeArgs(args: MessageArg[]): string {
       return arg.toString();
     } else if (typeof arg === "string") {
       return JSON.stringify(arg);
-    } else {
+    } else if ("color" in arg) {
       return arg.color;
+    } else if ("lnumCol" in arg) {
+      return `${arg.lnumCol[0]}/${arg.lnumCol[1]}`;
     }
   }).join(" ");
 }

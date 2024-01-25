@@ -26,18 +26,20 @@ export const Cmd = new Command()
     const varRefs: number[] = [];
 
     const viewVars = async (ref: number) => {
-        const varsResp = await stub.variables({
-          variablesReference: ref,
-        });
+      const varsResp = await stub.variables({
+        variablesReference: ref,
+      });
 
-        varRefs.length = 0;
-        listItems.length = 0;
-        for (const variable of varsResp.variables) {
-          varRefs.push(variable.variablesReference);
-          const separator = variable.type ? `: ${variable.type} = ` : ' = ';
-          const expandHint = variable.variablesReference > 0 ? ' [...]' : '';
-          listItems.push(`${variable.name}${separator}${variable.value}${expandHint}`);
-        }
+      varRefs.length = 0;
+      listItems.length = 0;
+      for (const variable of varsResp.variables) {
+        varRefs.push(variable.variablesReference);
+        const separator = variable.type ? `: ${variable.type} = ` : " = ";
+        const expandHint = variable.variablesReference > 0 ? " [...]" : "";
+        listItems.push(
+          `${variable.name}${separator}${variable.value}${expandHint}`,
+        );
+      }
     };
 
     const listViewState: ListViewState = {
@@ -73,9 +75,13 @@ export const Cmd = new Command()
             listItems.length = 0;
             for (const variable of varsResp.variables) {
               varRefs.push(variable.variablesReference);
-              const separator = variable.type ? `: ${variable.type} = ` : ' = ';
-              const expandHint = variable.variablesReference > 0 ? ' [...]' : '';
-              listItems.push(`${variable.name}${separator}${variable.value}${expandHint}`);
+              const separator = variable.type ? `: ${variable.type} = ` : " = ";
+              const expandHint = variable.variablesReference > 0
+                ? " [...]"
+                : "";
+              listItems.push(
+                `${variable.name}${separator}${variable.value}${expandHint}`,
+              );
             }
 
             break;

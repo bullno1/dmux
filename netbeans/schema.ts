@@ -2,9 +2,12 @@ import { Type } from "../deps/typebox.ts";
 
 // Reference: https://vimhelp.org/netbeans.txt.html
 
-export const Offset = Type.Union([Type.Number(), Type.String()]);
+export const LnumCol = Type.Object({
+  lnumCol: Type.Tuple([Type.Number(), Type.Number()]),
+});
+export const Offset = Type.Union([Type.Number(), LnumCol]);
 export const Color = Type.Object({
-  color: Type.Union([Type.Number(), Type.String()])
+  color: Type.Union([Type.Number(), Type.String()]),
 });
 
 // https://vimhelp.org/netbeans.txt.html#nb-commands
@@ -15,8 +18,7 @@ export const CommandSpec = {
     off: Offset,
     len: Type.Number(),
   }),
-  create: Type.Object({
-  }),
+  create: Type.Object({}),
   defineAnnoType: Type.Object({
     typeNum: Type.Number(),
     typeName: Type.String(),
@@ -31,17 +33,22 @@ export const CommandSpec = {
   setVisible: Type.Object({
     visible: Type.Boolean(),
   }),
+  setDot: Type.Object({
+    off: Offset,
+  }),
+  netbeansBuffer: Type.Object({
+    isNetbeansBuffer: Type.Boolean(),
+  }),
 };
 
 // https://vimhelp.org/netbeans.txt.html#nb-functions
 export const FunctionSpec = {
   getAnno: {
-    request: Type.Object({
-    }),
+    request: Type.Object({}),
     response: Type.Object({
       lnum: Type.Number(),
     }),
-  }
+  },
 };
 
 // https://vimhelp.org/netbeans.txt.html#nb-events

@@ -351,7 +351,9 @@ export const ScopesResponse = Type.Object({
 
 export const VariablesArguments = Type.Object({
   variablesReference: Type.Number(),
-  filter: Type.Optional(Type.Union([Type.Literal('indexed'), Type.Literal('named')])),
+  filter: Type.Optional(
+    Type.Union([Type.Literal("indexed"), Type.Literal("named")]),
+  ),
   start: Type.Optional(Type.Number()),
   count: Type.Optional(Type.Number()),
   format: Type.Optional(ValueFormat),

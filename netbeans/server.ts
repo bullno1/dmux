@@ -146,7 +146,7 @@ async function handleClient(
 
       const allowed = await handler.onConnect(connectionImpl, message.password);
       onConnectCalled = true;
-      if (!allowed) { return; }
+      if (!allowed) return;
     }
 
     while (

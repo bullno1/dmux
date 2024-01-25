@@ -2,7 +2,7 @@ import { Command } from "../deps/cliffy/command.ts";
 import { encodeBase64 } from "../deps/std/base64.ts";
 import { connectToServer, locateSession } from "./common.ts";
 import { runServer, ServerHandler } from "../netbeans/server.ts";
-import { CommandSpec, FunctionSpec, EventSpec } from "../netbeans/schema.ts";
+import { CommandSpec, EventSpec, FunctionSpec } from "../netbeans/schema.ts";
 import { ClientStub, makeClientStub } from "../netbeans/wrapper.ts";
 import { getLogger } from "../logging.ts";
 
@@ -51,7 +51,7 @@ export const Cmd = new Command()
       await Deno.writeTextFile(
         sessionFile,
         `host=127.0.0.1\nport=${port}\nauth=${password}\n`,
-        { mode: 0o0600 }
+        { mode: 0o0600 },
       );
 
       logger.info(`Run \`vim -nb=${sessionFile}\` to connect`);
@@ -59,18 +59,20 @@ export const Cmd = new Command()
       const clients = new Map<number, Client>();
 
       const setupClient = async (client: Client) => {
-          await new Promise<void>((resolve) => {
-            client.once("startupDone", () => resolve());
-          });
+        await new Promise<void>((resolve) => {
+          client.once("startupDone", () => resolve());
+        });
 
         await client.create(SourceBufferNumber, {});
-        await client.setVisible(SourceBufferNumber, { visible: false });
       };
 
       await dapClient["dmux/listen"]({});
 
       dapClient.on("dmux/focus", async (event) => {
-        if (event.focus.stackFrameId === undefined || event.focus.threadId === undefined) { return; }
+        if (
+          event.focus.stackFrameId === undefined ||
+          event.focus.threadId === undefined
+        ) return;
 
         const stackTraceResult = await dapClient.stackTrace({
           threadId: event.focus.threadId,
@@ -84,7 +86,10 @@ export const Cmd = new Command()
                   SourceBufferNumber,
                   { pathName: frame.source?.path },
                 );
-                await client.setVisible(SourceBufferNumber, { visible: true });
+                await client.setDot(
+                  SourceBufferNumber,
+                  { off: { lnumCol: [frame.line, frame.column] } },
+                );
               }
             }
 
@@ -99,12 +104,15 @@ export const Cmd = new Command()
 
           if (authorized) {
             const client = makeClientStub(
-              connection, CommandSpec, FunctionSpec, EventSpec
+              connection,
+              CommandSpec,
+              FunctionSpec,
+              EventSpec,
             );
 
             setupClient(client).then(
               () => clients.set(connection.id, client),
-              (e) => logger.error({ client: connection.id }, e)
+              (e) => logger.error({ client: connection.id }, e),
             );
           }
 
