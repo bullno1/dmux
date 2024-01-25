@@ -27,6 +27,9 @@ export const CommandSpec = {
     fg: Color,
     bg: Color,
   }),
+  removeAnno: Type.Object({
+    serNum: Type.Number(),
+  }),
   editFile: Type.Object({
     pathName: Type.String(),
   }),

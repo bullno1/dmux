@@ -1,5 +1,6 @@
 import { Command } from "../deps/cliffy/command.ts";
 import { encodeBase64 } from "../deps/std/base64.ts";
+import { Static } from "../deps/typebox.ts";
 import { connectToServer, locateSession } from "./common.ts";
 import { runServer, ServerHandler } from "../netbeans/server.ts";
 import { CommandSpec, EventSpec, FunctionSpec } from "../netbeans/schema.ts";
@@ -13,6 +14,18 @@ type Client = ClientStub<
 >;
 
 const SourceBufferNumber = 1;
+const ExecAnnoSerNum = 1;
+
+const AnnoTypes: (Static<typeof CommandSpec.defineAnnoType>)[] = [
+  {
+    typeNum: 1,
+    typeName: 'exec',
+    tooltip: '',
+    glyphFile: '>>',
+    fg: { color: 'White' },
+    bg: { color: 'Red' },
+  }
+];
 
 export const Cmd = new Command()
   .name("vim")
@@ -89,6 +102,22 @@ export const Cmd = new Command()
                 await client.setDot(
                   SourceBufferNumber,
                   { off: { lnumCol: [frame.line, frame.column] } },
+                );
+                for (const annoType of AnnoTypes) {
+                  await client.defineAnnoType(SourceBufferNumber, annoType);
+                }
+                await client.removeAnno(
+                  SourceBufferNumber,
+                  { serNum: ExecAnnoSerNum },
+                );
+                await client.addAnno(
+                  SourceBufferNumber,
+                  {
+                    serNum: ExecAnnoSerNum,
+                    typeNum: 1,
+                    off: { lnumCol: [frame.line, frame.column] },
+                    len: 0,
+                  },
                 );
               }
             }
