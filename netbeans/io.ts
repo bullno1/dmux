@@ -177,7 +177,7 @@ export class MessageReader {
 
           throw new ProtocolError("Could not parse: " + firstPart);
       } catch (e) {
-        throw new ProtocolError(`Could not parse '${line}"`, { cause: e });
+        throw new ProtocolError(`Could not parse '${line}'`, { cause: e });
       }
     }
   }
@@ -238,11 +238,12 @@ function findSplitPos(str: string): number {
 function parseArgs(args: string[]): MessageArg[] {
   return args.map((arg) => {
     if (arg.charCodeAt(0) === Quote) {
-      const str = JSON.parse(arg);
-      if (typeof str !== "string") {
-        throw new ProtocolError(`Invalid string: '${arg}'`);
-      }
-      return str;
+      return arg.slice(1, arg.length - 1)
+        .replaceAll('\\n', '\n')
+        .replaceAll('\\t', '\t')
+        .replaceAll('\\r', '\r')
+        .replaceAll('\\"', '"')
+        .replaceAll('\\\\', '\\');
     } else if (arg === "T") {
       return true;
     } else if (arg === "F") {
