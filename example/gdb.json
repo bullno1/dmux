@@ -1,0 +1,9 @@
+{
+  "executable": "gdb",
+  "args": ["--interpreter=dap"],
+  "mode": "launch",
+  "config": {
+    "program": "example/example",
+    "stopAtBeginningOfMainSubprogram": true
+  }
+}

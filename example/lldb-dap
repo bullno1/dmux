@@ -1,0 +1,12 @@
+#!/bin/sh -e
+
+if [ command -v lldb-dap > /dev/null ]
+then
+    exec deno task start server \
+        --config-file example/lldb-dap.json
+else
+    # Use lldb-vscode instead
+    exec deno task start server \
+        --config-file example/lldb-dap.json \
+        --config '{"executable": "lldb-vscode"}'
+fi

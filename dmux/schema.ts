@@ -1,6 +1,10 @@
 import { Type } from "../deps/typebox.ts";
 import { Capabilities } from "../dap/schema.ts";
 
+// Project
+
+// Types
+
 export const Ignored = Type.Optional(Type.Unknown());
 
 export const ViewFocus = Type.Object({
@@ -11,6 +15,8 @@ export const ViewFocus = Type.Object({
 export const ViewFocusChange = Type.Object({
   focus: ViewFocus,
 });
+
+// Request
 
 export const DmuxInfoResponse = Type.Object({
   adapter: Type.Object({
@@ -33,6 +39,8 @@ export const RequestSpec = {
     response: ViewFocusChange,
   },
 };
+
+// Event
 
 export const EventSpec = {
   "dmux/focus": ViewFocusChange,

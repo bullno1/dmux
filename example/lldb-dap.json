@@ -1,0 +1,11 @@
+{
+  "executable": "lldb-dap",
+  "args": [""],
+  "mode": "launch",
+  "config": {
+    "program": "example/example",
+    "preRunCommands": [
+      "breakpoint set --name main"
+    ]
+  }
+}

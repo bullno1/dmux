@@ -15,17 +15,28 @@ import {
   EventSpec as DmuxEventSpec,
   RequestSpec as DmuxRequestSpec,
   ViewFocus,
-} from "../dmux/spec.ts";
+} from "../dmux/schema.ts";
 import {
   ArgumentValue,
   Command,
-  EnumType,
   ValidationError,
 } from "../deps/cliffy/command.ts";
-import { Static } from "../deps/typebox.ts";
+import { Type, TypeCompiler, Static } from "../deps/typebox.ts";
 import { getLogger } from "../logging.ts";
 import { superslug } from "../deps/superslug.ts";
 import { ClientConnection } from "../dap/server.ts";
+
+const ConfigSchema = Type.Object({
+  executable: Type.String(),
+  args: Type.Array(Type.String()),
+  mode: Type.Union([
+    Type.Literal("launch"),
+    Type.Literal("attach"),
+  ]),
+  config: Type.Optional(Type.Object({})),
+});
+
+const ConfigSchemaChecker = TypeCompiler.Compile(ConfigSchema);
 
 function JSONString(
   { label, name, value }: ArgumentValue,
@@ -41,57 +52,52 @@ function JSONString(
   }
 }
 
-enum Mode {
-  Launch = "launch",
-  Attach = "attach",
-}
-
 type EventSender<T extends EventSpec> = {
   <Event extends keyof T & string>(event: Event, args: Static<T[Event]>): void;
 };
 
 export const Cmd = new Command()
-  .name("server")
   .description("The debugger multiplexer server.")
-  .option("--adapter <path:string>", "Path to the debug adapter.", {
-    default: "lldb-vscode",
-  })
-  .type("Mode", new EnumType(Mode))
   .type("JSONString", JSONString)
-  .option("--mode <mode:Mode>", "Debug mode.", {
-    required: true,
-  })
   .option(
     "--session-name <path:string>",
     "Name for the session. A random one will be generated if omitted.",
   )
   .option(
-    "--args <args:JSONString>",
-    "Arguments for the adapter. Must be a valid JSON string.",
+    "--config <args:JSONString>",
+    "Config for the adapter. Must be a valid JSON string.",
     {
       default: {},
     },
   )
   .option(
-    "--args-file <path:string>",
+    "--config-file <path:string>",
     "Arguments for the adapter. Must be a path to a valid JSON file.",
   )
   .action(async ({
-    adapter,
-    mode,
     sessionName,
-    args,
-    argsFile,
+    config,
+    configFile,
   }) => {
-    const debuggerCmd = new Deno.Command(adapter, {
+    let configFromFile: Record<string, unknown> = {};
+    if (configFile) {
+      configFromFile = JSON.parse(await Deno.readTextFile(configFile));
+    }
+    const mergedConfig = Object.assign({}, configFromFile, config);
+    if (!ConfigSchemaChecker.Check(mergedConfig)) {
+      for (const error of ConfigSchemaChecker.Errors(mergedConfig)) {
+        console.error(error);
+      }
+
+      return;
+    }
+
+    const debuggerCmd = new Deno.Command(mergedConfig.executable, {
+      args: mergedConfig.args,
       stdin: "piped",
       stdout: "piped",
       stderr: "inherit",
     });
-    let argsFromFile: Record<string, unknown> = {};
-    if (argsFile) {
-      argsFromFile = JSON.parse(await Deno.readTextFile(argsFile));
-    }
 
     const debuggerProc = debuggerCmd.spawn();
 
@@ -125,13 +131,12 @@ export const Cmd = new Command()
       const capabilities = await dapClient.initialize({ adapterID: "dap" });
       logger.debug("Adapter capabilities:", capabilities);
 
-      const debuggerArgs = Object.assign({}, argsFromFile, args);
-      switch (mode) {
-        case Mode.Launch:
-          logger.debug(await dapClient.launch(debuggerArgs));
+      switch (mergedConfig.mode) {
+        case "launch":
+          logger.debug(await dapClient.launch(mergedConfig.config || {}));
           break;
-        case Mode.Attach:
-          logger.debug(await dapClient.attach(debuggerArgs));
+        case "attach":
+          logger.debug(await dapClient.attach(mergedConfig.config || {}));
           break;
       }
 

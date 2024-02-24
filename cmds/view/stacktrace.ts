@@ -1,7 +1,7 @@
 import { Command } from "../../deps/cliffy/command.ts";
 import { connectToServer } from "../common.ts";
 import { StackFrame } from "../../dap/schema.ts";
-import { ViewFocus } from "../../dmux/spec.ts";
+import { ViewFocus } from "../../dmux/schema.ts";
 import { Static } from "../../deps/typebox.ts";
 import { makeEventSource, run as runTui } from "../../tui/index.ts";
 import { ListView, State as ListViewState } from "../../tui/list-view.ts";

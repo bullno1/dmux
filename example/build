@@ -1,0 +1,3 @@
+#!/bin/sh -e
+
+cc -g main.c module.c -o example

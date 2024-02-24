@@ -11,7 +11,7 @@ import {
 import {
   EventSpec as DmuxEventSpec,
   RequestSpec as DmuxRequestSpec,
-} from "../dmux/spec.ts";
+} from "../dmux/schema.ts";
 
 const LF = new Uint8Array([10]);
 const ProcFsSessionPrefix = "@dmux/";
