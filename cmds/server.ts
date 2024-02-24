@@ -21,7 +21,7 @@ import {
   Command,
   ValidationError,
 } from "../deps/cliffy/command.ts";
-import { Type, TypeCompiler, Static } from "../deps/typebox.ts";
+import { Static, Type, TypeCompiler } from "../deps/typebox.ts";
 import { getLogger } from "../logging.ts";
 import { superslug } from "../deps/superslug.ts";
 import { ClientConnection } from "../dap/server.ts";
