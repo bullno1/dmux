@@ -2,8 +2,13 @@ import { Command } from "../deps/cliffy/command.ts";
 import { encodeBase64 } from "../deps/std/base64.ts";
 import { Static } from "../deps/typebox.ts";
 import { connectToServer, locateSession } from "./common.ts";
-import { runServer, ServerHandler } from "../netbeans/server.ts";
+import {
+  ClientConnection,
+  runServer,
+  ServerHandler,
+} from "../netbeans/server.ts";
 import { CommandSpec, EventSpec, FunctionSpec } from "../netbeans/schema.ts";
+import { StackFrame } from "../dap/schema.ts";
 import { ClientStub, makeClientStub } from "../netbeans/wrapper.ts";
 import { getLogger } from "../logging.ts";
 
@@ -13,12 +18,13 @@ type Client = ClientStub<
   typeof EventSpec
 >;
 
-const SourceBufferNumber = 1;
-const ExecAnnoSerNum = 1;
+enum AnnoType {
+  Exec = 1,
+}
 
 const AnnoTypes: (Static<typeof CommandSpec.defineAnnoType>)[] = [
   {
-    typeNum: 1,
+    typeNum: AnnoType.Exec,
     typeName: "exec",
     tooltip: "",
     glyphFile: ">>",
@@ -69,15 +75,7 @@ export const Cmd = new Command()
 
       logger.info(`Run \`vim -nb=${sessionFile}\` to connect`);
 
-      const clients = new Map<number, Client>();
-
-      const setupClient = async (client: Client) => {
-        await new Promise<void>((resolve) => {
-          client.once("startupDone", () => resolve());
-        });
-
-        await client.create(SourceBufferNumber, {});
-      };
+      const editors = new Map<number, Editor>();
 
       await dapClient["dmux/listen"]({});
 
@@ -93,33 +91,11 @@ export const Cmd = new Command()
 
         for (const frame of stackTraceResult.stackFrames) {
           if (frame.id === event.focus.stackFrameId) {
-            if (frame.source?.path !== undefined) {
-              for (const client of clients.values()) {
-                await client.editFile(
-                  SourceBufferNumber,
-                  { pathName: frame.source?.path },
-                );
-                await client.setDot(
-                  SourceBufferNumber,
-                  { off: { lnumCol: [frame.line, frame.column] } },
-                );
-                for (const annoType of AnnoTypes) {
-                  await client.defineAnnoType(SourceBufferNumber, annoType);
-                }
-                await client.removeAnno(
-                  SourceBufferNumber,
-                  { serNum: ExecAnnoSerNum },
-                );
-                await client.addAnno(
-                  SourceBufferNumber,
-                  {
-                    serNum: ExecAnnoSerNum,
-                    typeNum: 1,
-                    off: { lnumCol: [frame.line, frame.column] },
-                    len: 0,
-                  },
-                );
-              }
+            for (const editor of editors.values()) {
+              editor.focus(frame).catch((err) => {
+                editors.delete(editor.id);
+                logger.error({ editor: editor.id }, err);
+              });
             }
 
             break;
@@ -132,23 +108,18 @@ export const Cmd = new Command()
           const authorized = authPassword === password;
 
           if (authorized) {
-            const client = makeClientStub(
-              connection,
-              CommandSpec,
-              FunctionSpec,
-              EventSpec,
-            );
+            const editor = new Editor(connection);
 
-            setupClient(client).then(
-              () => clients.set(connection.id, client),
-              (e) => logger.error({ client: connection.id }, e),
+            editor.setup().then(
+              () => editors.set(editor.id, editor),
+              (e) => logger.error({ editor: connection.id }, e),
             );
           }
 
           return Promise.resolve(authorized);
         },
         onDisconnect: (connection) => {
-          clients.delete(connection.id);
+          editors.delete(connection.id);
           return Promise.resolve();
         },
         onShutdown: () => {
@@ -164,3 +135,94 @@ export const Cmd = new Command()
       ]);
     }
   });
+
+class Editor {
+  public readonly id: number;
+  private client: Client;
+  private pathToBufferId = new Map<string, number>();
+  private nextBufferId = 1;
+  private freeAnnoSerNums: number[] = [];
+  private nextAnnoSerNum = 1;
+  private execAnnoSernum: number | null = null;
+
+  constructor(connection: ClientConnection) {
+    this.client = makeClientStub(
+      connection,
+      CommandSpec,
+      FunctionSpec,
+      EventSpec,
+    );
+    this.id = connection.id;
+  }
+
+  async setup(): Promise<void> {
+    await new Promise<void>((resolve) => {
+      this.client.once("startupDone", () => resolve());
+    });
+  }
+
+  async focus(frame: Static<typeof StackFrame>): Promise<void> {
+    const path = frame.source?.path;
+    if (path === undefined) return;
+    const bufferId = await this.getBufferId(path);
+
+    await this.client.editFile(
+      bufferId,
+      { pathName: path },
+    );
+    await this.client.setDot(
+      bufferId,
+      { off: { lnumCol: [frame.line, frame.column] } },
+    );
+
+    if (this.execAnnoSernum !== null) {
+      await this.removeAnno(bufferId, this.execAnnoSernum);
+    }
+    this.execAnnoSernum = await this.addAnno(
+      bufferId,
+      AnnoType.Exec,
+      frame.line,
+      frame.column,
+    );
+  }
+
+  private async getBufferId(path: string): Promise<number> {
+    let id = this.pathToBufferId.get(path);
+    if (id === undefined) {
+      id = this.nextBufferId++;
+      this.pathToBufferId.set(path, id);
+
+      for (const annoType of AnnoTypes) {
+        await this.client.defineAnnoType(id, annoType);
+      }
+    }
+
+    return id;
+  }
+
+  private async addAnno(
+    bufId: number,
+    type: AnnoType,
+    line: number,
+    column: number,
+  ): Promise<number> {
+    let annoSerNum = this.freeAnnoSerNums.pop();
+    if (annoSerNum === undefined) {
+      annoSerNum = this.nextAnnoSerNum++;
+    }
+
+    await this.client.addAnno(bufId, {
+      serNum: annoSerNum,
+      typeNum: type,
+      off: { lnumCol: [line, column] },
+      len: 0, // Unused
+    });
+
+    return annoSerNum;
+  }
+
+  private async removeAnno(bufId: number, annoSerNum: number): Promise<void> {
+    await this.client.removeAnno(bufId, { serNum: annoSerNum });
+    this.freeAnnoSerNums.push(annoSerNum);
+  }
+}
