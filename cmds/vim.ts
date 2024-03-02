@@ -1,7 +1,7 @@
 import { Command } from "../deps/cliffy/command.ts";
 import { encodeBase64 } from "../deps/std/base64.ts";
 import { Static } from "../deps/typebox.ts";
-import { connectToServer, locateSession } from "./common.ts";
+import { connectToServer, DmuxClientStub, locateSession } from "./common.ts";
 import {
   ClientConnection,
   runServer,
@@ -108,7 +108,7 @@ export const Cmd = new Command()
           const authorized = authPassword === password;
 
           if (authorized) {
-            const editor = new Editor(connection);
+            const editor = new Editor(connection, dapClient);
 
             editor.setup().then(
               () => editors.set(editor.id, editor),
@@ -145,7 +145,10 @@ class Editor {
   private nextAnnoSerNum = 1;
   private execAnnoSernum: number | null = null;
 
-  constructor(connection: ClientConnection) {
+  constructor(
+    connection: ClientConnection,
+    private dapClient: DmuxClientStub,
+  ) {
     this.client = makeClientStub(
       connection,
       CommandSpec,
@@ -159,6 +162,23 @@ class Editor {
     await new Promise<void>((resolve) => {
       this.client.once("startupDone", () => resolve());
     });
+
+    const info = await this.dapClient["dmux/info"]({});
+    if (
+      info.viewFocus.stackFrameId !== undefined &&
+      info.viewFocus.threadId !== undefined
+    ) {
+      const stackTraceResult = await this.dapClient.stackTrace({
+        threadId: info.viewFocus.threadId,
+      });
+
+      for (const frame of stackTraceResult.stackFrames) {
+        if (frame.id === info.viewFocus.stackFrameId) {
+          await this.focus(frame);
+          break;
+        }
+      }
+    }
   }
 
   async focus(frame: Static<typeof StackFrame>): Promise<void> {
