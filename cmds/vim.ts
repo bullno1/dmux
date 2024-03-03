@@ -179,6 +179,12 @@ class Editor {
         }
       }
     }
+
+    this.client.specialKeys(0, {
+      key: "F8",
+    });
+
+    this.client.on("keyAtPos", this.onKeyCommand);
   }
 
   async focus(frame: Static<typeof StackFrame>): Promise<void> {
@@ -244,5 +250,28 @@ class Editor {
   private async removeAnno(bufId: number, annoSerNum: number): Promise<void> {
     await this.client.removeAnno(bufId, { serNum: annoSerNum });
     this.freeAnnoSerNums.push(annoSerNum);
+  }
+
+  private onKeyCommand = (
+    _bufId: number,
+    event: Static<typeof EventSpec["keyAtPos"]>,
+  ) => {
+    switch (event.keyName) {
+      case "F8":
+        this.step();
+        break;
+    }
+  };
+
+  private async step(): Promise<void> {
+    const info = await this.dapClient["dmux/info"]({});
+    if (info.viewFocus.threadId === undefined) {
+      return;
+    }
+
+    await this.dapClient.next({
+      threadId: info.viewFocus.threadId,
+      granularity: "line",
+    });
   }
 }

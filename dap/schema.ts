@@ -263,6 +263,12 @@ export const Variable = Type.Object({
   memoryReference: Type.Optional(Type.String()),
 });
 
+export const SteppingGranularity = Type.Union([
+  Type.Literal("statement"),
+  Type.Literal("line"),
+  Type.Literal("instruction"),
+]);
+
 // }}}
 
 // https://microsoft.github.io/debug-adapter-protocol/specification#requests
@@ -363,6 +369,12 @@ export const VariablesResponse = Type.Object({
   variables: Type.Array(Variable),
 });
 
+export const NextArguments = Type.Object({
+  threadId: Type.Number(),
+  singleThread: Type.Optional(Type.Boolean()),
+  granularity: SteppingGranularity,
+});
+
 export const RequestSpec = {
   initialize: {
     request: InitializeRequestArguments,
@@ -403,6 +415,10 @@ export const RequestSpec = {
   variables: {
     request: VariablesArguments,
     response: VariablesResponse,
+  },
+  next: {
+    request: NextArguments,
+    response: Ignored,
   },
 };
 

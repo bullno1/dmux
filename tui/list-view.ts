@@ -5,12 +5,14 @@ import {
   cursorHide,
   cursorTo,
 } from "../deps/cliffy/ansi.ts";
+import { KeyPressEvent } from "../deps/cliffy/keypress.ts";
 
 export interface State {
   title: string;
   list: string[];
   selectedIndex: number;
   selectionChanged?: (index: number) => Promise<void> | void;
+  keyPressed?: (index: number, event: KeyPressEvent) => Promise<void> | void;
 }
 
 export function ListView(state: State): Tui {
@@ -52,6 +54,8 @@ export function ListView(state: State): Tui {
             } else if (event.value.key === "return") {
               state.selectedIndex = activeIndex;
               await state.selectionChanged?.(activeIndex);
+            } else {
+              await state.keyPressed?.(activeIndex, event.value);
             }
           }
           continue;

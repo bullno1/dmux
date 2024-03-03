@@ -42,6 +42,9 @@ export const CommandSpec = {
   netbeansBuffer: Type.Object({
     isNetbeansBuffer: Type.Boolean(),
   }),
+  specialKeys: Type.Object({
+    key: Type.String(),
+  }),
 };
 
 // https://vimhelp.org/netbeans.txt.html#nb-functions
@@ -69,5 +72,10 @@ export const EventSpec = {
     pathName: Type.String(),
     open: Type.Boolean(),
     modified: Type.Boolean(),
+  }),
+  keyAtPos: Type.Object({
+    keyName: Type.String(),
+    off: Offset,
+    lnumCol: LnumCol,
   }),
 };
