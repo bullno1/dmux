@@ -372,7 +372,14 @@ export const VariablesResponse = Type.Object({
 export const NextArguments = Type.Object({
   threadId: Type.Number(),
   singleThread: Type.Optional(Type.Boolean()),
-  granularity: SteppingGranularity,
+  granularity: Type.Optional(SteppingGranularity),
+});
+
+export const StepInArguments = Type.Object({
+  threadId: Type.Number(),
+  singleThread: Type.Optional(Type.Boolean()),
+  targetId: Type.Optional(Type.Boolean()),
+  granularity: Type.Optional(SteppingGranularity),
 });
 
 export const RequestSpec = {
@@ -418,6 +425,10 @@ export const RequestSpec = {
   },
   next: {
     request: NextArguments,
+    response: Ignored,
+  },
+  stepIn: {
+    request: StepInArguments,
     response: Ignored,
   },
 };

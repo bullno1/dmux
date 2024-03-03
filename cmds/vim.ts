@@ -180,9 +180,9 @@ class Editor {
       }
     }
 
-    this.client.specialKeys(0, {
-      key: "F8",
-    });
+    this.client.specialKeys(0, { key: "F8" });
+    this.client.specialKeys(0, { key: "F7" });
+    this.client.specialKeys(0, { key: "CF7" });
 
     this.client.on("keyAtPos", this.onKeyCommand);
   }
@@ -258,18 +258,35 @@ class Editor {
   ) => {
     switch (event.keyName) {
       case "F8":
-        this.step();
+        this.stepOver();
+        break;
+      case "F7":
+        this.stepIn();
         break;
     }
   };
 
-  private async step(): Promise<void> {
+  private async stepOver(): Promise<void> {
+    // TODO: cache thread id
     const info = await this.dapClient["dmux/info"]({});
     if (info.viewFocus.threadId === undefined) {
       return;
     }
 
     await this.dapClient.next({
+      threadId: info.viewFocus.threadId,
+      granularity: "line",
+    });
+  }
+
+  private async stepIn(): Promise<void> {
+    // TODO: cache thread id
+    const info = await this.dapClient["dmux/info"]({});
+    if (info.viewFocus.threadId === undefined) {
+      return;
+    }
+
+    await this.dapClient.stepIn({
       threadId: info.viewFocus.threadId,
       granularity: "line",
     });
