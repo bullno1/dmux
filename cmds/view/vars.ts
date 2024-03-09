@@ -36,17 +36,6 @@ export const Cmd = new Command()
     let variables: Static<typeof Variable>[] = [];
     let currentFrameState: FrameState = { viewPath: [] };
 
-    const formatVars = () => {
-      listItems.length = 0;
-      for (const variable of variables) {
-        const separator = variable.type ? `: ${variable.type} = ` : " = ";
-        const expandHint = variable.variablesReference > 0 ? " [...]" : "";
-        listItems.push(
-          `${variable.name}${separator}${variable.value}${expandHint}`,
-        );
-      }
-    };
-
     const listViewState: ListViewState = {
       title: scopeName,
       selectedIndex: 0,
@@ -61,9 +50,25 @@ export const Cmd = new Command()
         variables = (await stub.variables({
           variablesReference: variable.variablesReference,
         })).variables;
-        formatVars();
+        refreshView();
       },
     };
+
+    function refreshView() {
+      listItems.length = 0;
+      for (const variable of variables) {
+        const separator = variable.type ? `: ${variable.type} = ` : " = ";
+        const expandHint = variable.variablesReference > 0 ? " [...]" : "";
+        listItems.push(
+          `${variable.name}${separator}${variable.value}${expandHint}`,
+        );
+      }
+
+      const pathHint = currentFrameState.viewPath.length > 0 ? '.' : '';
+      listViewState.title = `${scopeName}${pathHint}${
+        currentFrameState.viewPath.join(".")
+      }`;
+    }
 
     const refresh = async () => {
       if (focus.threadId === undefined) {
@@ -127,7 +132,7 @@ export const Cmd = new Command()
           }
         }
 
-        formatVars();
+        refreshView();
 
         break;
       }
