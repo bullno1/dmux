@@ -7,7 +7,13 @@ import {
   runServer,
   ServerHandler,
 } from "../netbeans/server.ts";
-import { CommandSpec, EventSpec, FunctionSpec } from "../netbeans/schema.ts";
+import {
+  CommandSpec,
+  EventSpec,
+  FunctionSpec,
+  LnumCol,
+} from "../netbeans/schema.ts";
+import { EventSpec as DmuxEventSpec } from "../dmux/schema.ts";
 import { StackFrame } from "../dap/schema.ts";
 import { ClientStub, makeClientStub } from "../netbeans/wrapper.ts";
 import { getLogger } from "../logging.ts";
@@ -20,6 +26,7 @@ type Client = ClientStub<
 
 enum AnnoType {
   Exec = 1,
+  Breakpoint = 2,
 }
 
 const AnnoTypes: (Static<typeof CommandSpec.defineAnnoType>)[] = [
@@ -28,6 +35,14 @@ const AnnoTypes: (Static<typeof CommandSpec.defineAnnoType>)[] = [
     typeName: "exec",
     tooltip: "",
     glyphFile: ">>",
+    fg: { color: "White" },
+    bg: { color: "Blue" },
+  },
+  {
+    typeNum: AnnoType.Breakpoint,
+    typeName: "breakpoint",
+    tooltip: "",
+    glyphFile: "bp",
     fg: { color: "White" },
     bg: { color: "Red" },
   },
@@ -136,14 +151,22 @@ export const Cmd = new Command()
     }
   });
 
+interface BufferState {
+  readonly id: number;
+  readonly path: string;
+
+  freeAnnoSerNums: number[];
+  nextAnnoSerNum: number;
+  execAnnoSernum: number | null;
+  breakpointAnnoSerNums: number[];
+}
+
 class Editor {
   public readonly id: number;
   private client: Client;
-  private pathToBufferId = new Map<string, number>();
+  private bufferByPath = new Map<string, BufferState>();
+  private bufferById = new Map<number, BufferState>();
   private nextBufferId = 1;
-  private freeAnnoSerNums: number[] = [];
-  private nextAnnoSerNum = 1;
-  private execAnnoSernum: number | null = null;
 
   constructor(
     connection: ClientConnection,
@@ -182,63 +205,89 @@ class Editor {
 
     this.client.specialKeys(0, { key: "F5" });
     this.client.specialKeys(0, { key: "F8" });
+    this.client.specialKeys(0, { key: "C-F8" });
     this.client.specialKeys(0, { key: "F7" });
     this.client.specialKeys(0, { key: "C-F7" });
 
     this.client.on("keyAtPos", this.onKeyCommand);
+    this.dapClient.on("dmux/updateBreakpoints", this.onBreakpointUpdated);
   }
 
   async focus(frame: Static<typeof StackFrame>): Promise<void> {
     const path = frame.source?.path;
     if (path === undefined) return;
-    const bufferId = await this.getBufferId(path);
+    const buffer = await this.getBufferForPath(path);
 
-    await this.client.editFile(
-      bufferId,
-      { pathName: path },
-    );
     await this.client.setDot(
-      bufferId,
+      buffer.id,
       { off: { lnumCol: [frame.line, frame.column] } },
     );
 
-    if (this.execAnnoSernum !== null) {
-      await this.removeAnno(bufferId, this.execAnnoSernum);
+    if (buffer.execAnnoSernum !== null) {
+      await this.removeAnno(buffer, buffer.execAnnoSernum);
     }
-    this.execAnnoSernum = await this.addAnno(
-      bufferId,
+    buffer.execAnnoSernum = await this.addAnno(
+      buffer,
       AnnoType.Exec,
       frame.line,
       frame.column,
     );
   }
 
-  private async getBufferId(path: string): Promise<number> {
-    let id = this.pathToBufferId.get(path);
-    if (id === undefined) {
-      id = this.nextBufferId++;
-      this.pathToBufferId.set(path, id);
+  private async getBufferForPath(path: string): Promise<BufferState> {
+    let buffer = this.bufferByPath.get(path);
+    if (buffer === undefined) {
+      const id = this.nextBufferId++;
+      buffer = {
+        id,
+        path,
+        execAnnoSernum: null,
+        freeAnnoSerNums: [],
+        nextAnnoSerNum: 1,
+        breakpointAnnoSerNums: [],
+      };
+      this.bufferById.set(id, buffer);
+      this.bufferByPath.set(path, buffer);
+
+      await this.client.editFile(
+        buffer.id,
+        { pathName: path },
+      );
 
       for (const annoType of AnnoTypes) {
         await this.client.defineAnnoType(id, annoType);
       }
+
+      const breakpoints = (await this.dapClient["dmux/getBreakpoints"]({
+        path: buffer.path,
+      })).breakpoints;
+      for (const breakpoint of breakpoints) {
+        buffer.breakpointAnnoSerNums.push(
+          await this.addAnno(
+            buffer,
+            AnnoType.Breakpoint,
+            breakpoint.location.line,
+            1,
+          ),
+        );
+      }
     }
 
-    return id;
+    return buffer;
   }
 
   private async addAnno(
-    bufId: number,
+    buffer: BufferState,
     type: AnnoType,
     line: number,
     column: number,
   ): Promise<number> {
-    let annoSerNum = this.freeAnnoSerNums.pop();
+    let annoSerNum = buffer.freeAnnoSerNums.pop();
     if (annoSerNum === undefined) {
-      annoSerNum = this.nextAnnoSerNum++;
+      annoSerNum = buffer.nextAnnoSerNum++;
     }
 
-    await this.client.addAnno(bufId, {
+    await this.client.addAnno(buffer.id, {
       serNum: annoSerNum,
       typeNum: type,
       off: { lnumCol: [line, column] },
@@ -248,13 +297,16 @@ class Editor {
     return annoSerNum;
   }
 
-  private async removeAnno(bufId: number, annoSerNum: number): Promise<void> {
-    await this.client.removeAnno(bufId, { serNum: annoSerNum });
-    this.freeAnnoSerNums.push(annoSerNum);
+  private async removeAnno(
+    buffer: BufferState,
+    annoSerNum: number,
+  ): Promise<void> {
+    await this.client.removeAnno(buffer.id, { serNum: annoSerNum });
+    buffer.freeAnnoSerNums.push(annoSerNum);
   }
 
   private onKeyCommand = (
-    _bufId: number,
+    bufId: number,
     event: Static<typeof EventSpec["keyAtPos"]>,
   ) => {
     switch (event.keyName) {
@@ -264,12 +316,36 @@ class Editor {
       case "F8":
         this.stepOver();
         break;
+      case "C-F8":
+        this.toggleBreakpoint(bufId, event.lnumCol);
+        break;
       case "F7":
         this.stepIn();
         break;
       case "C-F7":
         this.stepOut();
         break;
+    }
+  };
+
+  private onBreakpointUpdated = async (
+    event: Static<typeof DmuxEventSpec["dmux/updateBreakpoints"]>,
+  ) => {
+    const buffer = await this.getBufferForPath(event.path);
+    for (const annoSerNum of buffer.breakpointAnnoSerNums) {
+      await this.removeAnno(buffer, annoSerNum);
+    }
+    buffer.breakpointAnnoSerNums.length = 0;
+
+    for (const breakpoint of event.breakpoints) {
+      buffer.breakpointAnnoSerNums.push(
+        await this.addAnno(
+          buffer,
+          AnnoType.Breakpoint,
+          breakpoint.location.line,
+          1,
+        ),
+      );
     }
   };
 
@@ -321,6 +397,35 @@ class Editor {
 
     await this.dapClient.continue({
       threadId: info.viewFocus.threadId,
+    });
+  }
+
+  private async toggleBreakpoint(
+    bufId: number,
+    location: Static<typeof LnumCol>,
+  ): Promise<void> {
+    const buffer = this.bufferById.get(bufId);
+    if (buffer === undefined) {
+      return;
+    }
+
+    const breakpoints = (
+      await this.dapClient["dmux/getBreakpoints"]({ path: buffer.path })
+    ).breakpoints;
+    let foundBreakpoint = false;
+    for (const breakpoint of breakpoints) {
+      if (breakpoint.location.line === location.lnumCol[0]) {
+        foundBreakpoint = true;
+        break;
+      }
+    }
+
+    await this.dapClient["dmux/setBreakpoint"]({
+      path: buffer.path,
+      enabled: !foundBreakpoint,
+      location: {
+        line: location.lnumCol[0],
+      },
     });
   }
 }

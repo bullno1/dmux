@@ -12,6 +12,7 @@ import {
   RequestSpec as DapRequestSpec,
 } from "../dap/schema.ts";
 import {
+  Breakpoint as BreakpointSpec,
   EventSpec as DmuxEventSpec,
   RequestSpec as DmuxRequestSpec,
 } from "../dmux/schema.ts";
@@ -148,6 +149,7 @@ export const Cmd = new Command()
       const listeners = new Set<ClientConnection>();
       const focusedStackFrame = new Map<number, number>();
       let focusedThread: number | undefined = undefined;
+      const breakpoints = new Map<string, Static<typeof BreakpointSpec>[]>();
 
       // Focus on the first thread
       {
@@ -235,6 +237,85 @@ export const Cmd = new Command()
           };
           broadcastEvent("dmux/focus", { focus: viewFocus });
           return Promise.resolve({ focus: viewFocus });
+        },
+        "dmux/setBreakpoint": async (_client, info) => {
+          let shouldUpdate = false;
+          let sourceBreakpoints = breakpoints.get(info.path);
+          if (info.enabled) {
+            if (sourceBreakpoints === undefined) {
+              sourceBreakpoints = [];
+              breakpoints.set(info.path, sourceBreakpoints);
+            }
+
+            let foundBreakpoint = false;
+            for (let i = 0; i < sourceBreakpoints.length; ++i) {
+              const breakpoint = sourceBreakpoints[i];
+              if (breakpoint.location.line === info.location.line) {
+                foundBreakpoint = true;
+                if (info.data !== undefined) {
+                  breakpoint.data = info.data;
+                }
+              }
+            }
+
+            if (!foundBreakpoint) {
+              sourceBreakpoints.push({
+                location: info.location,
+                data: info.data !== undefined ? info.data : {},
+              });
+            }
+
+            shouldUpdate = true;
+          } else {
+            if (sourceBreakpoints !== undefined) {
+              let foundBreakpoint = false;
+              for (let i = 0; i < sourceBreakpoints.length; ++i) {
+                const breakpoint = sourceBreakpoints[i];
+                if (breakpoint.location.line === info.location.line) {
+                  foundBreakpoint = true;
+                  sourceBreakpoints.splice(i, 1);
+                  break;
+                }
+              }
+              shouldUpdate = foundBreakpoint;
+            }
+          }
+
+          if (shouldUpdate && sourceBreakpoints !== undefined) {
+            const result = await dapClient.setBreakpoints({
+              source: {
+                path: info.path,
+              },
+              breakpoints: sourceBreakpoints.map((breakpoint) => ({
+                line: breakpoint.location.line,
+              })),
+            });
+
+            sourceBreakpoints.length = 0;
+            for (const breakpoint of result.breakpoints) {
+              if (breakpoint.line !== undefined) {
+                sourceBreakpoints.push({
+                  data: {},
+                  location: {
+                    line: breakpoint.line,
+                  },
+                });
+              }
+            }
+
+            broadcastEvent("dmux/updateBreakpoints", {
+              path: info.path,
+              breakpoints: sourceBreakpoints,
+            });
+          }
+
+          return Promise.resolve({});
+        },
+        "dmux/getBreakpoints": (_client, { path }) => {
+          const fileBreakPoints = breakpoints.get(path);
+          return Promise.resolve({
+            breakpoints: fileBreakPoints !== undefined ? fileBreakPoints : [],
+          });
         },
       };
 

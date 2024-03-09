@@ -16,6 +16,17 @@ export const ViewFocusChange = Type.Object({
   focus: ViewFocus,
 });
 
+export const SourceLocation = Type.Object({
+  line: Type.Number(),
+});
+
+export const BreakpointData = Type.Object({});
+
+export const Breakpoint = Type.Object({
+  location: SourceLocation,
+  data: BreakpointData,
+});
+
 // Request
 
 export const DmuxInfoResponse = Type.Object({
@@ -38,10 +49,31 @@ export const RequestSpec = {
     request: ViewFocusChange,
     response: ViewFocusChange,
   },
+  "dmux/setBreakpoint": {
+    request: Type.Object({
+      enabled: Type.Boolean(),
+      path: Type.String(),
+      location: SourceLocation,
+      data: Type.Optional(BreakpointData),
+    }),
+    response: Ignored,
+  },
+  "dmux/getBreakpoints": {
+    request: Type.Object({
+      path: Type.String(),
+    }),
+    response: Type.Object({
+      breakpoints: Type.Array(Breakpoint),
+    }),
+  },
 };
 
 // Event
 
 export const EventSpec = {
   "dmux/focus": ViewFocusChange,
+  "dmux/updateBreakpoints": Type.Object({
+    path: Type.String(),
+    breakpoints: Type.Array(Breakpoint),
+  }),
 };

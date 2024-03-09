@@ -74,11 +74,11 @@ export const Cmd = new Command()
         );
       }
 
-      const pathHint = currentFrameState.viewPath.length > 0 ? '.' : '';
+      const pathHint = currentFrameState.viewPath.length > 0 ? "." : "";
       listViewState.title = `${scopeName}${pathHint}${
         currentFrameState.viewPath.join(".")
       }`;
-    }
+    };
 
     const refresh = async () => {
       if (focus.threadId === undefined) {

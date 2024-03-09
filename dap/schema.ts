@@ -269,6 +269,15 @@ export const SteppingGranularity = Type.Union([
   Type.Literal("instruction"),
 ]);
 
+export const SourceBreakpoint = Type.Object({
+  line: Type.Number(),
+  column: Type.Optional(Type.Number()),
+  condition: Type.Optional(Type.String()),
+  hitCondition: Type.Optional(Type.String()),
+  logMessage: Type.Optional(Type.String()),
+  mode: Type.Optional(Type.String()),
+});
+
 // }}}
 
 // https://microsoft.github.io/debug-adapter-protocol/specification#requests
@@ -393,6 +402,16 @@ export const ContinueArguments = Type.Object({
   singleThread: Type.Optional(Type.Boolean()),
 });
 
+export const SetBreakpointsArguments = Type.Object({
+  source: Source,
+  breakpoints: Type.Optional(Type.Array(SourceBreakpoint)),
+  sourceModified: Type.Optional(Type.Boolean()),
+});
+
+export const SetBreakpointsResponse = Type.Object({
+  breakpoints: Type.Array(Breakpoint),
+});
+
 export const RequestSpec = {
   initialize: {
     request: InitializeRequestArguments,
@@ -449,6 +468,10 @@ export const RequestSpec = {
   continue: {
     request: ContinueArguments,
     response: Ignored,
+  },
+  setBreakpoints: {
+    request: SetBreakpointsArguments,
+    response: SetBreakpointsResponse,
   },
 };
 
