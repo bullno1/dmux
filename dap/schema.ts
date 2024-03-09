@@ -388,6 +388,11 @@ export const StepOutArguments = Type.Object({
   granularity: Type.Optional(SteppingGranularity),
 });
 
+export const ContinueArguments = Type.Object({
+  threadId: Type.Number(),
+  singleThread: Type.Optional(Type.Boolean()),
+});
+
 export const RequestSpec = {
   initialize: {
     request: InitializeRequestArguments,
@@ -439,6 +444,10 @@ export const RequestSpec = {
   },
   stepOut: {
     request: StepOutArguments,
+    response: Ignored,
+  },
+  continue: {
+    request: ContinueArguments,
     response: Ignored,
   },
 };

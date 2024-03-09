@@ -180,6 +180,7 @@ class Editor {
       }
     }
 
+    this.client.specialKeys(0, { key: "F5" });
     this.client.specialKeys(0, { key: "F8" });
     this.client.specialKeys(0, { key: "F7" });
     this.client.specialKeys(0, { key: "C-F7" });
@@ -257,6 +258,9 @@ class Editor {
     event: Static<typeof EventSpec["keyAtPos"]>,
   ) => {
     switch (event.keyName) {
+      case "F5":
+        this.continue();
+        break;
       case "F8":
         this.stepOver();
         break;
@@ -305,6 +309,18 @@ class Editor {
     await this.dapClient.stepOut({
       threadId: info.viewFocus.threadId,
       granularity: "line",
+    });
+  }
+
+  private async continue(): Promise<void> {
+    // TODO: cache thread id
+    const info = await this.dapClient["dmux/info"]({});
+    if (info.viewFocus.threadId === undefined) {
+      return;
+    }
+
+    await this.dapClient.continue({
+      threadId: info.viewFocus.threadId,
     });
   }
 }
