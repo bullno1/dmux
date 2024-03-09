@@ -154,6 +154,13 @@ export const Cmd = new Command()
         const threadsResponse = await dapClient.threads({});
         if (threadsResponse.threads.length > 0) {
           focusedThread = threadsResponse.threads[0].id;
+
+          const resp = await dapClient.stackTrace({
+            threadId: focusedThread,
+          });
+          if (resp.stackFrames.length > 0) {
+            focusedStackFrame.set(focusedThread, resp.stackFrames[0].id);
+          }
         }
       }
 
@@ -171,6 +178,28 @@ export const Cmd = new Command()
 
       const broadcastEvent: EventSender<typeof DmuxEventSpec> =
         broadcastRawEvent;
+
+      dapClient.on("stopped", async (event) => {
+        if (event.threadId !== undefined) {
+          focusedThread = event.threadId;
+          if (!focusedStackFrame.has(focusedThread)) {
+            const resp = await dapClient.stackTrace({
+              threadId: focusedThread,
+            });
+            if (resp.stackFrames.length > 0) {
+              focusedStackFrame.set(focusedThread, resp.stackFrames[0].id);
+            }
+          }
+
+          const viewFocus = {
+            threadId: focusedThread,
+            stackFrameId: focusedThread !== undefined
+              ? focusedStackFrame.get(focusedThread)
+              : undefined,
+          };
+          broadcastRawEvent("dmux/focus", { focus: viewFocus });
+        }
+      });
 
       const requestHandlers: ServerStub<typeof DmuxRequestSpec> = {
         "dmux/info": (_client, _args) =>

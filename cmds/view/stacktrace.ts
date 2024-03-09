@@ -21,19 +21,13 @@ export const Cmd = new Command()
     let stackFrames: Static<typeof StackFrame>[] = [];
     const stackEntryList: string[] = [];
 
-    const setFocusFrame = (id: number) => {
-      return stub["dmux/focus"]({
-        focus: { stackFrameId: id },
-      });
-    };
-
     const listViewState: ListViewState = {
       title: "Stacktrace",
       selectedIndex: 0,
       list: stackEntryList,
       selectionChanged: async (index) => {
         focus.stackFrameId = stackFrames[index].id;
-        await setFocusFrame(stackFrames[index].id);
+        await stub["dmux/focus"]({ focus });
       },
     };
 
@@ -52,10 +46,6 @@ export const Cmd = new Command()
         });
 
         stackFrames = stackTraceResponse.stackFrames;
-        if (focus.stackFrameId === undefined && stackFrames.length > 0) {
-          await setFocusFrame(stackFrames[0].id);
-          return; // Wait for dmux/focus to bounce back
-        }
 
         stackEntryList.length = 0;
         formatStackTrace(stackEntryList, stackFrames);
