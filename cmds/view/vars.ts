@@ -6,6 +6,14 @@ import { Static } from "../../deps/typebox.ts";
 import { makeEventSource, run as runTui } from "../../tui/index.ts";
 import { ListView, State as ListViewState } from "../../tui/list-view.ts";
 
+type FrameState = {
+  viewPath: string[];
+};
+
+type ThreadState = Map<number, FrameState>;
+
+type ViewState = Map<number, ThreadState>;
+
 export const Cmd = new Command()
   .name("vars")
   .description("View variables.")
@@ -24,16 +32,13 @@ export const Cmd = new Command()
 
     let focus: Static<typeof ViewFocus> = {};
     const listItems: string[] = [];
-    const viewPath: string[] = [];
+    const viewState: ViewState = new Map<number, Map<number, FrameState>>();
     let variables: Static<typeof Variable>[] = [];
+    let currentFrameState: FrameState = { viewPath: [] };
 
-    const viewVars = async (ref: number) => {
-      const varsResp = await stub.variables({
-        variablesReference: ref,
-      });
-
+    const formatVars = () => {
       listItems.length = 0;
-      for (const variable of varsResp.variables) {
+      for (const variable of variables) {
         const separator = variable.type ? `: ${variable.type} = ` : " = ";
         const expandHint = variable.variablesReference > 0 ? " [...]" : "";
         listItems.push(
@@ -46,9 +51,17 @@ export const Cmd = new Command()
       title: scopeName,
       selectedIndex: 0,
       list: listItems,
-      selectionChanged: (index) => {
-        const varRef = varRefs[index];
-        return viewVars(varRefs[index]);
+      selectionChanged: async (index) => {
+        const variable = variables[index];
+        if (variable.variablesReference <= 0) {
+          return;
+        }
+
+        currentFrameState.viewPath.push(variable.name);
+        variables = (await stub.variables({
+          variablesReference: variable.variablesReference,
+        })).variables;
+        formatVars();
       },
     };
 
@@ -58,9 +71,26 @@ export const Cmd = new Command()
         focus = info.viewFocus;
       }
 
+      if (focus.threadId === undefined) {
+        return;
+      }
+
+      let threadState = viewState.get(focus.threadId);
+      if (threadState === undefined) {
+        threadState = new Map<number, FrameState>();
+        viewState.set(focus.threadId, threadState);
+      }
+
       if (focus.stackFrameId === undefined) {
         return;
       }
+
+      let frameState = threadState.get(focus.stackFrameId);
+      if (frameState === undefined) {
+        frameState = { viewPath: [] };
+        threadState.set(focus.stackFrameId, frameState);
+      }
+      currentFrameState = frameState;
 
       const scopesResult = await stub.scopes({
         frameId: focus.stackFrameId,
@@ -71,21 +101,33 @@ export const Cmd = new Command()
           continue;
         }
 
-        listItems.length = 0;
+        // Since variablesReference is invalidated with every event we have to
+        // follow the view path by name
+        let varRef = scope.variablesReference;
+        variables = (await stub.variables({
+          variablesReference: varRef,
+        })).variables;
 
-        const varsResp = await stub.variables({
-          variablesReference: scope.variablesReference,
-        });
+        for (let i = 0; i < frameState.viewPath.length; ++i) {
+          let varFound = false;
+          for (const variable of variables) {
+            if (variable.name === frameState.viewPath[i]) {
+              varRef = variable.variablesReference;
+              variables = (await stub.variables({
+                variablesReference: varRef,
+              })).variables;
+              varFound = true;
+              break;
+            }
+          }
 
-        listItems.length = 0;
-        variables = varsResp.variables;
-        for (const variable of variables) {
-          const separator = variable.type ? `: ${variable.type} = ` : " = ";
-          const expandHint = variable.variablesReference > 0 ? " [...]" : "";
-          listItems.push(
-            `${variable.name}${separator}${variable.value}${expandHint}`,
-          );
+          if (!varFound) {
+            frameState.viewPath.length = i;
+            break;
+          }
         }
+
+        formatVars();
 
         break;
       }
