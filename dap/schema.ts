@@ -382,6 +382,12 @@ export const StepInArguments = Type.Object({
   granularity: Type.Optional(SteppingGranularity),
 });
 
+export const StepOutArguments = Type.Object({
+  threadId: Type.Number(),
+  singleThread: Type.Optional(Type.Boolean()),
+  granularity: Type.Optional(SteppingGranularity),
+});
+
 export const RequestSpec = {
   initialize: {
     request: InitializeRequestArguments,
@@ -429,6 +435,10 @@ export const RequestSpec = {
   },
   stepIn: {
     request: StepInArguments,
+    response: Ignored,
+  },
+  stepOut: {
+    request: StepOutArguments,
     response: Ignored,
   },
 };
