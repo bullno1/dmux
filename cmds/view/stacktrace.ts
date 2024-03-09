@@ -64,6 +64,12 @@ export const Cmd = new Command()
       }
     });
 
+    stub.on("stopped", (event) => {
+      if (event.threadId === focus.threadId) {
+        refresh();
+      }
+    });
+
     await refresh();
     await runTui(ListView(listViewState), source);
   });

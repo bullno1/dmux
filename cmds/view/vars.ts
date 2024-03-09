@@ -145,6 +145,10 @@ export const Cmd = new Command()
       }
     });
 
+    stub.on("stopped", (_event) => {
+      refresh();
+    });
+
     await refresh();
     await runTui(ListView(listViewState), source);
   });
