@@ -52,9 +52,19 @@ export const Cmd = new Command()
         })).variables;
         refreshView();
       },
+      keyPressed: async (_index, event) => {
+        switch (event.key) {
+          case "backspace":
+            if (currentFrameState.viewPath.length > 0) {
+              currentFrameState.viewPath.pop();
+              await refresh();
+            }
+            break;
+        }
+      },
     };
 
-    function refreshView() {
+    const refreshView = () => {
       listItems.length = 0;
       for (const variable of variables) {
         const separator = variable.type ? `: ${variable.type} = ` : " = ";
