@@ -1,6 +1,7 @@
 import { Command } from "../../deps/cliffy/command.ts";
 import { connectToServer } from "../common.ts";
 import { ViewFocus } from "../../dmux/schema.ts";
+import { Variable } from "../../dap/schema.ts";
 import { Static } from "../../deps/typebox.ts";
 import { makeEventSource, run as runTui } from "../../tui/index.ts";
 import { ListView, State as ListViewState } from "../../tui/list-view.ts";
@@ -23,17 +24,16 @@ export const Cmd = new Command()
 
     let focus: Static<typeof ViewFocus> = {};
     const listItems: string[] = [];
-    const varRefs: number[] = [];
+    const viewPath: string[] = [];
+    let variables: Static<typeof Variable>[] = [];
 
     const viewVars = async (ref: number) => {
       const varsResp = await stub.variables({
         variablesReference: ref,
       });
 
-      varRefs.length = 0;
       listItems.length = 0;
       for (const variable of varsResp.variables) {
-        varRefs.push(variable.variablesReference);
         const separator = variable.type ? `: ${variable.type} = ` : " = ";
         const expandHint = variable.variablesReference > 0 ? " [...]" : "";
         listItems.push(
@@ -47,6 +47,7 @@ export const Cmd = new Command()
       selectedIndex: 0,
       list: listItems,
       selectionChanged: (index) => {
+        const varRef = varRefs[index];
         return viewVars(varRefs[index]);
       },
     };
@@ -57,39 +58,39 @@ export const Cmd = new Command()
         focus = info.viewFocus;
       }
 
-      if (focus.stackFrameId !== undefined) {
-        const scopesResult = await stub.scopes({
-          frameId: focus.stackFrameId,
-        });
+      if (focus.stackFrameId === undefined) {
+        return;
+      }
 
-        for (const scope of scopesResult.scopes) {
-          if (scope.name === scopeName) {
-            listItems.length = 0;
-            varRefs.length = 0;
+      const scopesResult = await stub.scopes({
+        frameId: focus.stackFrameId,
+      });
 
-            const varsResp = await stub.variables({
-              variablesReference: scope.variablesReference,
-            });
-
-            varRefs.length = 0;
-            listItems.length = 0;
-            for (const variable of varsResp.variables) {
-              varRefs.push(variable.variablesReference);
-              const separator = variable.type ? `: ${variable.type} = ` : " = ";
-              const expandHint = variable.variablesReference > 0
-                ? " [...]"
-                : "";
-              listItems.push(
-                `${variable.name}${separator}${variable.value}${expandHint}`,
-              );
-            }
-
-            break;
-          }
+      for (const scope of scopesResult.scopes) {
+        if (scope.name !== scopeName) {
+          continue;
         }
 
-        sink({ type: "refresh" });
+        listItems.length = 0;
+
+        const varsResp = await stub.variables({
+          variablesReference: scope.variablesReference,
+        });
+
+        listItems.length = 0;
+        variables = varsResp.variables;
+        for (const variable of variables) {
+          const separator = variable.type ? `: ${variable.type} = ` : " = ";
+          const expandHint = variable.variablesReference > 0 ? " [...]" : "";
+          listItems.push(
+            `${variable.name}${separator}${variable.value}${expandHint}`,
+          );
+        }
+
+        break;
       }
+
+      sink({ type: "refresh" });
     };
 
     stub.on("dmux/focus", (event) => {

@@ -9,7 +9,12 @@ main(int argc, const char* argv[]) {
         value = strtol(argv[1], NULL, 10);
     }
 
-    printf("%d\n", some_function(value));
+    input_t input = {
+        .arg = value,
+        .inc = 1,
+    };
+
+    printf("%d\n", some_function(input));
 
     return 0;
 }

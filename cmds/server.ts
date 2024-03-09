@@ -14,7 +14,6 @@ import {
 import {
   EventSpec as DmuxEventSpec,
   RequestSpec as DmuxRequestSpec,
-  ViewFocus,
 } from "../dmux/schema.ts";
 import {
   ArgumentValue,
@@ -147,16 +146,14 @@ export const Cmd = new Command()
       await dapClient.configurationDone({});
 
       const listeners = new Set<ClientConnection>();
-      const viewFocus: Static<typeof ViewFocus> = {
-        threadId: undefined,
-        stackFrameId: undefined,
-      };
+      const focusedStackFrame = new Map<number, number>();
+      let focusedThread: number | undefined = undefined;
 
       // Focus on the first thread
       {
         const threadsResponse = await dapClient.threads({});
         if (threadsResponse.threads.length > 0) {
-          viewFocus.threadId = threadsResponse.threads[0].id;
+          focusedThread = threadsResponse.threads[0].id;
         }
       }
 
@@ -175,22 +172,18 @@ export const Cmd = new Command()
       const broadcastEvent: EventSender<typeof DmuxEventSpec> =
         broadcastRawEvent;
 
-      dapClient.on("stopped", (event) => {
-        // TODO: Handle focus on a per-thread basis
-        if (event.threadId !== undefined) {
-          viewFocus.threadId = event.threadId;
-          viewFocus.stackFrameId = undefined;
-          broadcastEvent("dmux/focus", { focus: viewFocus });
-        }
-      });
-
       const requestHandlers: ServerStub<typeof DmuxRequestSpec> = {
         "dmux/info": (_client, _args) =>
           Promise.resolve({
             adapter: {
               capabilities,
             },
-            viewFocus,
+            viewFocus: {
+              threadId: focusedThread,
+              stackFrameId: focusedThread !== undefined
+                ? focusedStackFrame.get(focusedThread)
+                : undefined,
+            },
           }),
         "dmux/listen": (client, _args) => {
           listeners.add(client);
@@ -198,14 +191,19 @@ export const Cmd = new Command()
         },
         "dmux/focus": (_client, { focus }) => {
           if (focus.threadId !== undefined) {
-            viewFocus.threadId = focus.threadId;
-            viewFocus.stackFrameId = undefined;
+            focusedThread = focus.threadId;
           }
 
-          if (focus.stackFrameId !== undefined) {
-            viewFocus.stackFrameId = focus.stackFrameId;
+          if (focusedThread !== undefined && focus.stackFrameId !== undefined) {
+            focusedStackFrame.set(focusedThread, focus.stackFrameId);
           }
 
+          const viewFocus = {
+            threadId: focusedThread,
+            stackFrameId: focusedThread !== undefined
+              ? focusedStackFrame.get(focusedThread)
+              : undefined,
+          };
           broadcastEvent("dmux/focus", { focus: viewFocus });
           return Promise.resolve({ focus: viewFocus });
         },
