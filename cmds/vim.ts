@@ -24,6 +24,11 @@ type Client = ClientStub<
   typeof EventSpec
 >;
 
+enum BufferPreparationMethod {
+  EditFile,
+  PutBufferNumber,
+}
+
 enum AnnoType {
   Exec = 1,
   Breakpoint = 2,
@@ -210,6 +215,7 @@ class Editor {
     this.client.specialKeys(0, { key: "C-F7" });
 
     this.client.on("keyAtPos", this.onKeyCommand);
+    this.client.on("fileOpened", this.onFileOpened);
     this.dapClient.on("dmux/updateBreakpoints", this.onBreakpointUpdated);
   }
 
@@ -234,7 +240,11 @@ class Editor {
     );
   }
 
-  private async getBufferForPath(path: string): Promise<BufferState> {
+  private async getBufferForPath(
+    path: string,
+    preparationMethod: BufferPreparationMethod =
+      BufferPreparationMethod.EditFile,
+  ): Promise<BufferState> {
     let buffer = this.bufferByPath.get(path);
     if (buffer === undefined) {
       const id = this.nextBufferId++;
@@ -249,10 +259,20 @@ class Editor {
       this.bufferById.set(id, buffer);
       this.bufferByPath.set(path, buffer);
 
-      await this.client.editFile(
-        buffer.id,
-        { pathName: path },
-      );
+      switch (preparationMethod) {
+        case BufferPreparationMethod.EditFile:
+          await this.client.editFile(
+            buffer.id,
+            { pathName: path },
+          );
+          break;
+        case BufferPreparationMethod.PutBufferNumber:
+          await this.client.putBufferNumber(
+            buffer.id,
+            { pathName: path },
+          );
+          break;
+      }
 
       for (const annoType of AnnoTypes) {
         await this.client.defineAnnoType(id, annoType);
@@ -326,6 +346,19 @@ class Editor {
         this.stepOut();
         break;
     }
+  };
+
+  private onFileOpened = async (
+    bufId: number,
+    event: Static<typeof EventSpec["fileOpened"]>,
+  ) => {
+    if (bufId !== 0) {
+      return;
+    }
+
+    await this.getBufferForPath(
+      event.pathName, BufferPreparationMethod.PutBufferNumber
+    );
   };
 
   private onBreakpointUpdated = async (

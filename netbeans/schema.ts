@@ -33,6 +33,9 @@ export const CommandSpec = {
   editFile: Type.Object({
     pathName: Type.String(),
   }),
+  putBufferNumber: Type.Object({
+    pathName: Type.String(),
+  }),
   setVisible: Type.Object({
     visible: Type.Boolean(),
   }),
