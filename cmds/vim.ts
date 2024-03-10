@@ -357,7 +357,8 @@ class Editor {
     }
 
     await this.getBufferForPath(
-      event.pathName, BufferPreparationMethod.PutBufferNumber
+      event.pathName,
+      BufferPreparationMethod.PutBufferNumber,
     );
   };
 

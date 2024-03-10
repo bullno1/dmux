@@ -211,7 +211,12 @@ export const Cmd = new Command()
       // Save breakpoints again in case they slip to the next line
       const tx = db.atomic();
       for (const [path, sourceBreakpoints] of breakpoints.entries()) {
-        tx.set(["breakpoint", path], sourceBreakpoints);
+        if (sourceBreakpoints.length > 0) {
+          tx.set(["breakpoint", path], sourceBreakpoints);
+        } else {
+          breakpoints.delete(path);
+          tx.delete(["breakpoint", path]);
+        }
       }
       const result = await tx.commit();
       if (!result.ok) {
@@ -369,10 +374,15 @@ export const Cmd = new Command()
             });
 
             try {
-              await db.set(
-                ["breakpoint", info.path],
-                sourceBreakpoints,
-              );
+              if (sourceBreakpoints.length > 0) {
+                await db.set(
+                  ["breakpoint", info.path],
+                  sourceBreakpoints,
+                );
+              } else {
+                breakpoints.delete(info.path);
+                await db.delete(["breakpoint", info.path]);
+              }
             } catch (e) {
               logger.warning("Could not save breakpoints", e);
             }
