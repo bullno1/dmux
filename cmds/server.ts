@@ -37,6 +37,7 @@ const ConfigSchema = Type.Object({
 });
 
 const ConfigSchemaChecker = TypeCompiler.Compile(ConfigSchema);
+const BreakpointSchemaChecker = TypeCompiler.Compile(BreakpointSpec);
 
 function JSONString(
   { label, name, value }: ArgumentValue,
@@ -74,10 +75,18 @@ export const Cmd = new Command()
     "--config-file <path:string>",
     "Arguments for the adapter. Must be a path to a valid JSON file.",
   )
+  .option(
+    "--project-file <path:string>",
+    "Project file",
+    {
+      default: ".dmux",
+    },
+  )
   .action(async ({
     sessionName,
     config,
     configFile,
+    projectFile,
   }) => {
     let configFromFile: Record<string, unknown> = {};
     if (configFile) {
@@ -122,6 +131,7 @@ export const Cmd = new Command()
       path: `\0dmux/${sessionName}`,
     });
     const logger = getLogger({ name: "server", sessionName });
+    const db = await Deno.openKv(projectFile);
 
     try {
       const initializedEvent = new Promise<void>((resolve) => {
@@ -144,27 +154,76 @@ export const Cmd = new Command()
       await initializedEvent;
       logger.info("Initialized");
 
-      await dapClient.configurationDone({});
+      const breakpoints = new Map<string, Static<typeof BreakpointSpec>[]>();
+
+      // Reload breakpoints
+      const savedBreakpoints = db.list({ prefix: ["breakpoint"] });
+      for await (const breakpointList of savedBreakpoints) {
+        if (breakpointList.key.length !== 2) {
+          continue;
+        }
+
+        const path = breakpointList.key[1];
+        if (typeof path !== "string") {
+          continue;
+        }
+
+        if (!Array.isArray(breakpointList.value)) {
+          continue;
+        }
+
+        const sourceBreakpoints: Static<typeof BreakpointSpec>[] = [];
+        for (const breakpoint of breakpointList.value) {
+          if (!BreakpointSchemaChecker.Check(breakpoint)) {
+            continue;
+          }
+
+          sourceBreakpoints.push(breakpoint);
+        }
+
+        breakpoints.set(path, sourceBreakpoints);
+      }
+
+      // Upload breakpoints
+      for (const [path, sourceBreakpoints] of breakpoints.entries()) {
+        console.log("Upload", path, sourceBreakpoints);
+        const result = await dapClient.setBreakpoints({
+          source: { path: path },
+          breakpoints: sourceBreakpoints.map((breakpoint) => ({
+            line: breakpoint.location.line,
+          })),
+        });
+
+        sourceBreakpoints.length = 0;
+        for (const breakpoint of result.breakpoints) {
+          if (breakpoint.line !== undefined) {
+            sourceBreakpoints.push({
+              data: {},
+              location: {
+                line: breakpoint.line,
+              },
+            });
+          }
+        }
+      }
+
+      // Save breakpoints again in case they slip to the next line
+      const tx = db.atomic();
+      for (const [path, sourceBreakpoints] of breakpoints.entries()) {
+        tx.set(["breakpoint", path], sourceBreakpoints);
+      }
+      const result = await tx.commit();
+      if (!result.ok) {
+        logger.warning("Could not commit breakpoint");
+      }
+
+      if (capabilities.supportsConfigurationDoneRequest) {
+        await dapClient.configurationDone({});
+      }
 
       const listeners = new Set<ClientConnection>();
       const focusedStackFrame = new Map<number, number>();
       let focusedThread: number | undefined = undefined;
-      const breakpoints = new Map<string, Static<typeof BreakpointSpec>[]>();
-
-      // Focus on the first thread
-      {
-        const threadsResponse = await dapClient.threads({});
-        if (threadsResponse.threads.length > 0) {
-          focusedThread = threadsResponse.threads[0].id;
-
-          const resp = await dapClient.stackTrace({
-            threadId: focusedThread,
-          });
-          if (resp.stackFrames.length > 0) {
-            focusedStackFrame.set(focusedThread, resp.stackFrames[0].id);
-          }
-        }
-      }
 
       const broadcastRawEvent = (type: string, body: unknown) => {
         listeners.forEach((connection) => {
@@ -307,6 +366,15 @@ export const Cmd = new Command()
               path: info.path,
               breakpoints: sourceBreakpoints,
             });
+
+            try {
+              await db.set(
+                ["breakpoint", info.path],
+                sourceBreakpoints,
+              );
+            } catch (e) {
+              logger.warning("Could not save breakpoints", e);
+            }
           }
 
           return Promise.resolve({});
@@ -336,9 +404,19 @@ export const Cmd = new Command()
 
       await runServer(dmuxServer, serverHandler);
     } finally {
+      db.close();
       dmuxServer.close();
       reader.releaseLock();
-      await rawClient.stop();
-      await writer.close();
+      try {
+        await rawClient.stop();
+      } catch (e) {
+        logger.warning("Could not stop rawClient", e);
+      }
+
+      try {
+        await writer.close();
+      } catch (e) {
+        logger.warning("Could not stop writer", e);
+      }
     }
   });
