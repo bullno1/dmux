@@ -25,6 +25,7 @@ import { Static, Type, TypeCompiler } from "../deps/typebox.ts";
 import { getLogger } from "../logging.ts";
 import { superslug } from "../deps/superslug.ts";
 import { ClientConnection } from "../dap/server.ts";
+import { dirname } from "../deps/std/path.ts";
 
 const ConfigSchema = Type.Object({
   executable: Type.String(),
@@ -79,7 +80,7 @@ export const Cmd = new Command()
     "--project-file <path:string>",
     "Project file",
     {
-      default: ".dmux",
+      default: ".dmux/project",
     },
   )
   .action(async ({
@@ -131,7 +132,7 @@ export const Cmd = new Command()
       path: `\0dmux/${sessionName}`,
     });
     const logger = getLogger({ name: "server", sessionName });
-    const db = await Deno.openKv(projectFile);
+    const db = await openDb(projectFile);
 
     try {
       const initializedEvent = new Promise<void>((resolve) => {
@@ -420,3 +421,9 @@ export const Cmd = new Command()
       }
     }
   });
+
+async function openDb(path: string): Promise<Deno.Kv> {
+  const dbDir = dirname(path);
+  await Deno.mkdir(dbDir, { recursive: true });
+  return Deno.openKv(path);
+}
