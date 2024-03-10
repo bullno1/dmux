@@ -216,6 +216,10 @@ class Editor {
 
     this.client.on("keyAtPos", this.onKeyCommand);
     this.client.on("fileOpened", this.onFileOpened);
+    if (info.adapter.capabilities.supportsEvaluateForHovers) {
+      this.client.on("balloonText", this.onBalloonText);
+    }
+
     this.dapClient.on("dmux/updateBreakpoints", this.onBreakpointUpdated);
   }
 
@@ -361,6 +365,31 @@ class Editor {
       BufferPreparationMethod.PutBufferNumber,
     );
   };
+
+  private onBalloonText = async (
+    bufId: number,
+    event: Static<typeof EventSpec["balloonText"]>,
+  ) => {
+    const info = await this.dapClient["dmux/info"]({});
+    const frameId = info.viewFocus.stackFrameId;
+    if (frameId === undefined) {
+      return;
+    }
+
+    let popupText: string;
+    try {
+      const result = await this.dapClient.evaluate({
+        context: "hover",
+        expression: event.text,
+        frameId,
+      });
+      popupText = result.result;
+    } catch (e) {
+      popupText = new String(e).toString();
+    }
+
+    await this.client.showBalloon(bufId, { text: popupText });
+  }
 
   private onBreakpointUpdated = async (
     event: Static<typeof DmuxEventSpec["dmux/updateBreakpoints"]>,

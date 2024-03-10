@@ -48,6 +48,9 @@ export const CommandSpec = {
   specialKeys: Type.Object({
     key: Type.String(),
   }),
+  showBalloon: Type.Object({
+    text: Type.String(),
+  }),
 };
 
 // https://vimhelp.org/netbeans.txt.html#nb-functions
@@ -80,5 +83,8 @@ export const EventSpec = {
     keyName: Type.String(),
     off: Offset,
     lnumCol: LnumCol,
+  }),
+  balloonText: Type.Object({
+    text: Type.String(),
   }),
 };
