@@ -389,7 +389,7 @@ class Editor {
     }
 
     await this.client.showBalloon(bufId, { text: popupText });
-  }
+  };
 
   private onBreakpointUpdated = async (
     event: Static<typeof DmuxEventSpec["dmux/updateBreakpoints"]>,
