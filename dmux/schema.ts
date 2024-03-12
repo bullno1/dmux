@@ -66,6 +66,15 @@ export const RequestSpec = {
       breakpoints: Type.Array(Breakpoint),
     }),
   },
+  "dmux/log": {
+    request: Type.Object({
+      level: Type.Number(),
+      timestamp: Type.Number(),
+      context: Type.Record(Type.String(), Type.Any()),
+      args: Type.Array(Type.Any()),
+    }),
+    response: Ignored,
+  },
 };
 
 // Event

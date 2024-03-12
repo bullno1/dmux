@@ -22,7 +22,7 @@ import {
   ValidationError,
 } from "../deps/cliffy/command.ts";
 import { Static, Type, TypeCompiler } from "../deps/typebox.ts";
-import { getLogger } from "../logging.ts";
+import { DefaultSink, getLogger } from "../logging.ts";
 import { superslug } from "../deps/superslug.ts";
 import { ClientConnection } from "../dap/server.ts";
 import { dirname } from "../deps/std/path.ts";
@@ -395,6 +395,10 @@ export const Cmd = new Command()
           return Promise.resolve({
             breakpoints: fileBreakPoints !== undefined ? fileBreakPoints : [],
           });
+        },
+        "dmux/log": (_client, { level, timestamp, context, args }) => {
+          DefaultSink.write(level, timestamp, context, args);
+          return Promise.resolve();
         },
       };
 
