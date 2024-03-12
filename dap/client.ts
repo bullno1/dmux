@@ -22,6 +22,7 @@ export class Client extends EventEmitter<ClientEvents> {
   private messageSeq = 0;
   private pendingRequests = new Map<number, Deferred<Response>>();
   private messageReader: MessageReader;
+  private flushRequests: Deferred<void>[] = [];
   private abortController: AbortController | null = null;
   private readLoopPromise: Promise<void> | null = null;
 
@@ -65,7 +66,16 @@ export class Client extends EventEmitter<ClientEvents> {
     return result;
   }
 
+  async flush(): Promise<void> {
+    while (this.pendingRequests.size > 0) {
+      await new Promise<void>((resolve, reject) => {
+        this.flushRequests.push({ resolve, reject });
+      });
+    }
+  }
+
   async stop(): Promise<void> {
+    await this.flush();
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
@@ -102,6 +112,11 @@ export class Client extends EventEmitter<ClientEvents> {
             if (deferred !== undefined) {
               this.pendingRequests.delete(requestSeq);
               deferred.resolve(message);
+
+              for (const flushRequest of this.flushRequests) {
+                flushRequest.resolve();
+              }
+              this.flushRequests.length = 0;
             }
           }
           break;

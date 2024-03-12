@@ -38,10 +38,7 @@ export const Cmd = new Command()
           },
         );
         const vim = command.spawn();
-        vim.status.finally(() => {
-          DefaultSink.target = Console;
-          abortController.abort();
-        });
+        vim.status.finally(() => abortController.abort());
       };
 
       await runServer({
@@ -51,6 +48,7 @@ export const Cmd = new Command()
         abortSignal: abortController.signal,
       });
     } finally {
+      DefaultSink.target = Console;
       abortController.abort();
       await rawClient.stop();
     }

@@ -6,6 +6,7 @@ import {
   writeMessage,
 } from "./io.ts";
 import { EventEmitter } from "../deps/event_emitter.ts";
+import { Aborted, waitForAbort } from "../utils/abort.ts";
 
 export interface Event {
   bufId: number;
@@ -35,16 +36,14 @@ export async function runServer(
   abortSignal?: AbortSignal,
 ): Promise<void> {
   const clientPromises = new Set<Promise<void>>();
-  const abortPromise = new Promise<null>((resolve) => {
-    abortSignal?.addEventListener("abort", () => resolve(null));
-  });
+  const abortPromise = waitForAbort(abortSignal);
 
   while (!abortSignal?.aborted) {
     const newConnection = await Promise.race([
       listener.accept(),
       abortPromise,
     ]);
-    if (newConnection === null) {
+    if (newConnection === Aborted) {
       break;
     }
 
