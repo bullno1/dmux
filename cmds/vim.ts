@@ -6,7 +6,7 @@ import { forwardLogToServer } from "../dmux/logging.ts";
 
 export const Cmd = new Command()
   .name("vim")
-  .description("Vim netbeans server.")
+  .description("Run vim as a code view.")
   .option("--session-name <sessionName:string>", "Session name.")
   .option(
     "--executable <executable:string>",
