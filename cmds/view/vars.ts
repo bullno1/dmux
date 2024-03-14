@@ -72,13 +72,30 @@ export const Cmd = new Command()
                 ? variable.evaluateName
                 : [...currentFrameState.viewPath, variable.name].join(".");
 
-              logger.debug("Adding watch", expression, focus.stackFrameId);
-              await stub["dmux/addWatch"]({
-                watch: {
-                  expression,
-                  frameId: focus.stackFrameId,
-                },
-              });
+              if (focus.threadId !== undefined) {
+                logger.debug("Adding watch", expression, focus.stackFrameId);
+                const stackTrace = (await stub.stackTrace({
+                  threadId: focus.threadId,
+                })).stackFrames;
+                let i: number;
+                for (i = 0; i < stackTrace.length; ++i) {
+                  if (stackTrace[i].id === focus.stackFrameId) {
+                    break;
+                  }
+                }
+
+                if (i < stackTrace.length) {
+                  await stub["dmux/addWatch"]({
+                    watch: {
+                      expression,
+                      context: {
+                        threadId: focus.threadId,
+                        frameOffset: stackTrace.length - i - 1,
+                      },
+                    },
+                  });
+                }
+              }
             }
             break;
         }

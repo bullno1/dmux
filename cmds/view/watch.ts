@@ -6,7 +6,7 @@ import { forwardLogToServer } from "../../dmux/logging.ts";
 import { getLogger } from "../../logging.ts";
 import { Static } from "../../deps/typebox.ts";
 import { WatchData as WatchDataSpec } from "../../dmux/schema.ts";
-import { EvaluateResponse } from "../../dap/schema.ts";
+import { EvaluateResponse, StackFrame } from "../../dap/schema.ts";
 
 export const Cmd = new Command()
   .name("watch")
@@ -23,15 +23,36 @@ export const Cmd = new Command()
     const listItems: string[] = [];
 
     const refresh = async () => {
+      const stackTraces = new Map<number, Static<typeof StackFrame>[]>();
+
       watchResults.clear();
       for (const [id, watchData] of watches.entries()) {
         try {
+          let frameId = undefined;
+          if (watchData.context !== undefined) {
+            let stackTrace = stackTraces.get(watchData.context.threadId);
+            if (stackTrace === undefined) {
+              stackTrace = (await stub.stackTrace({
+                threadId: watchData.context.threadId,
+              })).stackFrames;
+              stackTraces.set(watchData.context.threadId, stackTrace);
+            }
+
+            if (watchData.context.frameOffset >= stackTrace.length) {
+              continue;
+            }
+
+            const frameIndex = stackTrace.length -
+              watchData.context.frameOffset - 1;
+            frameId = stackTrace[frameIndex].id;
+          }
+
           watchResults.set(
             id,
             await stub.evaluate({
               context: "watch",
               expression: watchData.expression,
-              frameId: watchData.frameId,
+              frameId,
             }),
           );
         } catch (e) {
@@ -77,7 +98,7 @@ export const Cmd = new Command()
         refresh().catch((e) => logger.error(e));
       });
 
-      const existingWatches = (await stub["dmux/getWatches"]({}));
+      const existingWatches = await stub["dmux/getWatches"]({});
       for (const [id, watchData] of Object.entries(existingWatches)) {
         watches.set(parseInt(id), watchData);
       }

@@ -31,7 +31,12 @@ export const WatchId = Type.Number();
 
 export const WatchData = Type.Object({
   expression: Type.String(),
-  frameId: Type.Optional(Type.Number()),
+  context: Type.Optional(
+    Type.Object({
+      threadId: Type.Number(),
+      frameOffset: Type.Number(),
+    }),
+  ),
 });
 
 // Request
