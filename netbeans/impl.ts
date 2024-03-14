@@ -279,15 +279,17 @@ class Editor {
         path: buffer.path,
       })).breakpoints;
       const sourceBreakpoints = breakpoints[buffer.path];
-      for (const breakpoint of sourceBreakpoints) {
-        buffer.breakpointAnnoSerNums.push(
-          await this.addAnno(
-            buffer,
-            AnnoType.Breakpoint,
-            breakpoint.location.line,
-            1,
-          ),
-        );
+      if (sourceBreakpoints !== undefined) {
+        for (const breakpoint of sourceBreakpoints) {
+          buffer.breakpointAnnoSerNums.push(
+            await this.addAnno(
+              buffer,
+              AnnoType.Breakpoint,
+              breakpoint.location.line,
+              1,
+            ),
+          );
+        }
       }
     }
 
