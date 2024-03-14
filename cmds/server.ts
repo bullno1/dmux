@@ -15,6 +15,7 @@ import {
   Breakpoint as BreakpointSpec,
   EventSpec as DmuxEventSpec,
   RequestSpec as DmuxRequestSpec,
+  WatchData as WatchDataSpec,
 } from "../dmux/schema.ts";
 import {
   ArgumentValue,
@@ -155,6 +156,8 @@ export const Cmd = new Command()
       await initializedEvent;
       logger.info("Initialized");
 
+      const watches = new Map<number, Static<typeof WatchDataSpec>>();
+      let nextWatchId = 0;
       const breakpoints = new Map<string, Static<typeof BreakpointSpec>[]>();
 
       // Reload breakpoints
@@ -403,6 +406,26 @@ export const Cmd = new Command()
         "dmux/log": (_client, { level, timestamp, context, args }) => {
           DefaultSink.write(level, timestamp, context, args);
           return Promise.resolve();
+        },
+        "dmux/addWatch": (_client, { watch }) => {
+          const watchId = nextWatchId++;
+          watches.set(watchId, watch);
+          broadcastEvent("dmux/addWatch", {
+            id: watchId,
+            data: watch,
+          });
+          return Promise.resolve({ id: watchId });
+        },
+        "dmux/removeWatch": (_client, { id }) => {
+          if (watches.delete(id)) {
+            broadcastEvent("dmux/removeWatch", {
+              id: id,
+            });
+          }
+          return Promise.resolve({});
+        },
+        "dmux/getWatches": () => {
+          return Promise.resolve(Object.fromEntries(watches.entries()));
         },
       };
 

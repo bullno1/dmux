@@ -1,7 +1,7 @@
 import { Command } from "../deps/cliffy/command.ts";
 import { connectToServer } from "./common.ts";
 import { runServer, ServerInfo } from "../netbeans/impl.ts";
-import { getLogger, DefaultSink, Console } from "../logging.ts";
+import { Console, DefaultSink, getLogger } from "../logging.ts";
 import { forwardLogToServer } from "../dmux/logging.ts";
 
 export const Cmd = new Command()

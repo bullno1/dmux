@@ -27,6 +27,13 @@ export const Breakpoint = Type.Object({
   data: BreakpointData,
 });
 
+export const WatchId = Type.Number();
+
+export const WatchData = Type.Object({
+  expression: Type.String(),
+  frameId: Type.Optional(Type.Number()),
+});
+
 // Request
 
 export const DmuxInfoResponse = Type.Object({
@@ -69,6 +76,27 @@ export const RequestSpec = {
       ),
     }),
   },
+  "dmux/addWatch": {
+    request: Type.Object({
+      watch: WatchData,
+    }),
+    response: Type.Object({
+      id: Type.Number(),
+    }),
+  },
+  "dmux/removeWatch": {
+    request: Type.Object({
+      id: Type.Number(),
+    }),
+    response: Ignored,
+  },
+  "dmux/getWatches": {
+    request: Ignored,
+    response: Type.Record(
+      WatchId,
+      WatchData,
+    ),
+  },
   "dmux/log": {
     request: Type.Object({
       level: Type.Number(),
@@ -87,5 +115,12 @@ export const EventSpec = {
   "dmux/updateBreakpoints": Type.Object({
     path: Type.String(),
     breakpoints: Type.Array(Breakpoint),
+  }),
+  "dmux/addWatch": Type.Object({
+    id: WatchId,
+    data: WatchData,
+  }),
+  "dmux/removeWatch": Type.Object({
+    id: WatchId,
   }),
 };

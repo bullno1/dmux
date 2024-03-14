@@ -5,6 +5,8 @@ import { Variable } from "../../dap/schema.ts";
 import { Static } from "../../deps/typebox.ts";
 import { makeEventSource, run as runTui } from "../../tui/index.ts";
 import { ListView, State as ListViewState } from "../../tui/list-view.ts";
+import { forwardLogToServer } from "../../dmux/logging.ts";
+import { getLogger } from "../../logging.ts";
 
 type FrameState = {
   viewPath: string[];
@@ -23,6 +25,8 @@ export const Cmd = new Command()
   })
   .action(async ({ sessionName, scopeName }) => {
     const [_client, stub] = await connectToServer(sessionName);
+    const logger = getLogger({ name: "view/vars" });
+    forwardLogToServer(stub);
 
     await stub["dmux/listen"]({});
 
@@ -50,14 +54,31 @@ export const Cmd = new Command()
         variables = (await stub.variables({
           variablesReference: variable.variablesReference,
         })).variables;
+        logger.debug(variables);
         refreshView();
       },
-      keyPressed: async (_index, event) => {
+      keyPressed: async (index, event) => {
         switch (event.key) {
           case "backspace":
             if (currentFrameState.viewPath.length > 0) {
               currentFrameState.viewPath.pop();
               await refresh();
+            }
+            break;
+          case "w":
+            {
+              const variable = variables[index];
+              const expression = variable.evaluateName !== undefined
+                ? variable.evaluateName
+                : [...currentFrameState.viewPath, variable.name].join(".");
+
+              logger.debug("Adding watch", expression, focus.stackFrameId);
+              await stub["dmux/addWatch"]({
+                watch: {
+                  expression,
+                  frameId: focus.stackFrameId,
+                },
+              });
             }
             break;
         }
@@ -122,6 +143,7 @@ export const Cmd = new Command()
         variables = (await stub.variables({
           variablesReference: varRef,
         })).variables;
+        logger.debug(variables);
 
         for (let i = 0; i < frameState.viewPath.length; ++i) {
           let varFound = false;
@@ -131,6 +153,7 @@ export const Cmd = new Command()
               variables = (await stub.variables({
                 variablesReference: varRef,
               })).variables;
+              logger.debug(variables);
               varFound = true;
               break;
             }
