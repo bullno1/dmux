@@ -60,10 +60,13 @@ export const RequestSpec = {
   },
   "dmux/getBreakpoints": {
     request: Type.Object({
-      path: Type.String(),
+      path: Type.Optional(Type.String()),
     }),
     response: Type.Object({
-      breakpoints: Type.Array(Breakpoint),
+      breakpoints: Type.Record(
+        Type.String(),
+        Type.Array(Breakpoint),
+      ),
     }),
   },
   "dmux/log": {

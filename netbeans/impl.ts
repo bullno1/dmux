@@ -278,7 +278,8 @@ class Editor {
       const breakpoints = (await this.dapClient["dmux/getBreakpoints"]({
         path: buffer.path,
       })).breakpoints;
-      for (const breakpoint of breakpoints) {
+      const sourceBreakpoints = breakpoints[buffer.path];
+      for (const breakpoint of sourceBreakpoints) {
         buffer.breakpointAnnoSerNums.push(
           await this.addAnno(
             buffer,
@@ -468,8 +469,9 @@ class Editor {
     const breakpoints = (
       await this.dapClient["dmux/getBreakpoints"]({ path: buffer.path })
     ).breakpoints;
+    const sourceBreakpoints = breakpoints[buffer.path];
     let foundBreakpoint = false;
-    for (const breakpoint of breakpoints) {
+    for (const breakpoint of sourceBreakpoints) {
       if (breakpoint.location.line === location.lnumCol[0]) {
         foundBreakpoint = true;
         break;

@@ -391,10 +391,14 @@ export const Cmd = new Command()
           return Promise.resolve({});
         },
         "dmux/getBreakpoints": (_client, { path }) => {
-          const fileBreakPoints = breakpoints.get(path);
-          return Promise.resolve({
-            breakpoints: fileBreakPoints !== undefined ? fileBreakPoints : [],
+          const result: Record<string, Static<typeof BreakpointSpec>[]> = {};
+          breakpoints.forEach((sourceBreakpoints, file) => {
+            if (path === undefined || path === file) {
+              result[file] = sourceBreakpoints;
+            }
           });
+
+          return Promise.resolve({ breakpoints: result });
         },
         "dmux/log": (_client, { level, timestamp, context, args }) => {
           DefaultSink.write(level, timestamp, context, args);
