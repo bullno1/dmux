@@ -73,7 +73,6 @@ export const Cmd = new Command()
                 : [...currentFrameState.viewPath, variable.name].join(".");
 
               if (focus.threadId !== undefined) {
-                logger.debug("Adding watch", expression, focus.stackFrameId);
                 const stackTrace = (await stub.stackTrace({
                   threadId: focus.threadId,
                 })).stackFrames;

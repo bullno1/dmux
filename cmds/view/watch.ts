@@ -58,16 +58,16 @@ export const Cmd = new Command()
         } catch (e) {
           logger.error(e);
         }
+      }
 
-        listItems.length = 0;
-        for (const [id, watchData] of watches.entries()) {
-          const result = watchResults.get(id);
-          listItems.push(
-            `${watchData.expression} = ${
-              result !== undefined ? result.result : "<Error>"
-            }`,
-          );
-        }
+      listItems.length = 0;
+      for (const [id, watchData] of watches.entries()) {
+        const result = watchResults.get(id);
+        listItems.push(
+          `${watchData.expression} = ${
+            result !== undefined ? result.result : "<Error>"
+          }`,
+        );
       }
 
       sink({ type: "refresh" });
@@ -78,6 +78,19 @@ export const Cmd = new Command()
       selectedIndex: 0,
       list: listItems,
       selectionChanged: async () => {
+      },
+      keyPressed: async (index, event) => {
+        switch (event.key) {
+          case "backspace":
+            break;
+          case "d":
+            for (const id of watches.keys()) {
+              if (index-- === 0) {
+                await stub["dmux/removeWatch"]({ id });
+              }
+            }
+            break;
+        }
       },
     };
 
