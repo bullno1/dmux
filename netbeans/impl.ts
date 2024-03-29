@@ -473,10 +473,12 @@ class Editor {
     ).breakpoints;
     const sourceBreakpoints = breakpoints[buffer.path];
     let foundBreakpoint = false;
-    for (const breakpoint of sourceBreakpoints) {
-      if (breakpoint.location.line === location.lnumCol[0]) {
-        foundBreakpoint = true;
-        break;
+    if (sourceBreakpoints !== undefined) {
+      for (const breakpoint of sourceBreakpoints) {
+        if (breakpoint.location.line === location.lnumCol[0]) {
+          foundBreakpoint = true;
+          break;
+        }
       }
     }
 
