@@ -190,7 +190,6 @@ export const Cmd = new Command()
 
       // Upload breakpoints
       for (const [path, sourceBreakpoints] of breakpoints.entries()) {
-        console.log("Upload", path, sourceBreakpoints);
         const result = await dapClient.setBreakpoints({
           source: { path: path },
           breakpoints: sourceBreakpoints.map((breakpoint) => ({
