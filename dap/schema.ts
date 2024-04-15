@@ -412,6 +412,10 @@ export const SetBreakpointsResponse = Type.Object({
   breakpoints: Type.Array(Breakpoint),
 });
 
+export const PauseArguments = Type.Object({
+  threadId: Type.Number(),
+});
+
 export const RequestSpec = {
   initialize: {
     request: InitializeRequestArguments,
@@ -472,6 +476,10 @@ export const RequestSpec = {
   setBreakpoints: {
     request: SetBreakpointsArguments,
     response: SetBreakpointsResponse,
+  },
+  pause: {
+    request: PauseArguments,
+    response: Ignored,
   },
 };
 

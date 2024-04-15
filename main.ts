@@ -4,6 +4,7 @@ import { Cmd as ViewCmd } from "./cmds/view/index.ts";
 import { Cmd as InfoCmd } from "./cmds/info.ts";
 import { Cmd as SourceCmd } from "./cmds/source.ts";
 import { Cmd as ReplCmd } from "./cmds/repl.ts";
+import { Cmd as PauseCmd } from "./cmds/pause.ts";
 import { Cmd as VimCmd } from "./cmds/vim.ts";
 
 const cmd = new Command()
@@ -16,6 +17,7 @@ const cmd = new Command()
   .command("view", ViewCmd)
   .command("vim", VimCmd)
   .command("info", InfoCmd)
+  .command("pause", PauseCmd)
   .command("repl", ReplCmd)
   .command("source", SourceCmd);
 
