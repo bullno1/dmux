@@ -25,14 +25,15 @@ export async function writeMessage(
 ): Promise<void> {
   await writer.ready;
 
-  // TODO: Investigate why message cannot be written in 2 calls: one for header
-  // and one for body.
-  const body = JSON.stringify(message);
-  const bodyLength = encodeText(body).length;
+  const body = encodeText(JSON.stringify(message));
   const buff = encodeText(
-    `${ContentLengthHeader}: ${bodyLength}\r\n\r\n${body}`,
+    `${ContentLengthHeader}: ${body.length}\r\n\r\n`,
   );
-  await writer.write(buff);
+  // Ensure that there can be no other writes in between
+  await Promise.all([
+    writer.write(buff),
+    writer.write(body),
+  ]);
 }
 
 export class MessageReader {
