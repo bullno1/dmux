@@ -1,8 +1,8 @@
 {
   "tasks": {
-    "start": "deno run --allow-run --allow-read --allow-write --allow-net --allow-env main.ts",
+    "start": "deno run --allow-all main.ts",
     "check": "deno check main.ts && deno lint",
-    "compile": "deno compile --allow-run --allow-read --allow-write --allow-net --allow-env --output bin/dmux main.ts"
+    "compile": "deno compile --allow-all --output bin/dmux main.ts"
   },
   "unstable": ["net", "kv"]
 }
