@@ -26,12 +26,12 @@ export async function writeMessage(
   await writer.ready;
 
   const body = encodeText(JSON.stringify(message));
-  const buff = encodeText(
+  const header = encodeText(
     `${ContentLengthHeader}: ${body.length}\r\n\r\n`,
   );
   // Ensure that there can be no other writes in between
   await Promise.all([
-    writer.write(buff),
+    writer.write(header),
     writer.write(body),
   ]);
 }
