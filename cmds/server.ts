@@ -35,6 +35,7 @@ const ConfigSchema = Type.Object({
     Type.Literal("launch"),
     Type.Literal("attach"),
   ]),
+  waitForStopped: Type.Optional(Type.Boolean()),
   config: Type.Optional(Type.Object({})),
 });
 
@@ -156,6 +157,54 @@ export const Cmd = new Command()
       await initializedEvent;
       logger.info("Initialized");
 
+      const listeners = new Set<ClientConnection>();
+      const focusedStackFrame = new Map<number, number>();
+      let focusedThread: number | undefined = undefined;
+
+      const broadcastRawEvent = (type: string, body: unknown) => {
+        listeners.forEach((connection) => {
+          connection.sendEvent(type, body).catch(() => {
+            connection.disconnect();
+          });
+        });
+      };
+
+      rawClient.on("event", (message) => {
+        broadcastRawEvent(message.event, message.body);
+      });
+
+      const broadcastEvent: EventSender<typeof DmuxEventSpec> =
+        broadcastRawEvent;
+
+      dapClient.on("stopped", async (event) => {
+        if (event.threadId !== undefined) {
+          focusedThread = event.threadId;
+          if (!focusedStackFrame.has(focusedThread)) {
+            const resp = await dapClient.stackTrace({
+              threadId: focusedThread,
+            });
+            if (resp.stackFrames.length > 0) {
+              focusedStackFrame.set(focusedThread, resp.stackFrames[0].id);
+            }
+          }
+
+          const viewFocus = {
+            threadId: focusedThread,
+            stackFrameId: focusedThread !== undefined
+              ? focusedStackFrame.get(focusedThread)
+              : undefined,
+          };
+          broadcastRawEvent("dmux/focus", { focus: viewFocus });
+        }
+      });
+
+      // gdb requires this
+      if (mergedConfig.waitForStopped) {
+        await new Promise((resolve) => {
+          dapClient.once("stopped", resolve);
+        });
+      }
+
       const watches = new Map<number, Static<typeof WatchDataSpec>>();
       let nextWatchId = 0;
       const breakpoints = new Map<string, Static<typeof BreakpointSpec>[]>();
@@ -229,46 +278,6 @@ export const Cmd = new Command()
         await dapClient.configurationDone({});
       }
 
-      const listeners = new Set<ClientConnection>();
-      const focusedStackFrame = new Map<number, number>();
-      let focusedThread: number | undefined = undefined;
-
-      const broadcastRawEvent = (type: string, body: unknown) => {
-        listeners.forEach((connection) => {
-          connection.sendEvent(type, body).catch(() => {
-            connection.disconnect();
-          });
-        });
-      };
-
-      rawClient.on("event", (message) => {
-        broadcastRawEvent(message.event, message.body);
-      });
-
-      const broadcastEvent: EventSender<typeof DmuxEventSpec> =
-        broadcastRawEvent;
-
-      dapClient.on("stopped", async (event) => {
-        if (event.threadId !== undefined) {
-          focusedThread = event.threadId;
-          if (!focusedStackFrame.has(focusedThread)) {
-            const resp = await dapClient.stackTrace({
-              threadId: focusedThread,
-            });
-            if (resp.stackFrames.length > 0) {
-              focusedStackFrame.set(focusedThread, resp.stackFrames[0].id);
-            }
-          }
-
-          const viewFocus = {
-            threadId: focusedThread,
-            stackFrameId: focusedThread !== undefined
-              ? focusedStackFrame.get(focusedThread)
-              : undefined,
-          };
-          broadcastRawEvent("dmux/focus", { focus: viewFocus });
-        }
-      });
 
       const requestHandlers: ServerStub<typeof DmuxRequestSpec> = {
         "dmux/info": (_client, _args) =>

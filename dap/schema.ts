@@ -519,13 +519,13 @@ export const EventSpec = {
     name: Type.String(),
     systemProcessId: Type.Optional(Type.Number()),
     isLocalProcess: Type.Optional(Type.Boolean()),
-    startMethod: Type.Optional(
-      Type.Union([
-        Type.Literal("launch"),
-        Type.Literal("attach"),
-        Type.Literal("attachForSuspendedLaunch"),
-      ]),
-    ),
+    //startMethod: Type.Optional(
+      //Type.Union([
+        //Type.Literal("launch"),
+        //Type.Literal("attach"),
+        //Type.Literal("attachForSuspendedLaunch"),
+      //]),
+    //),
     pointerSize: Type.Optional(Type.Number()),
   }),
   stopped: Type.Object({

@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-if [ command -v lldb-dap > /dev/null ]
+if command -v lldb-dap > /dev/null
 then
     exec deno task start server \
         --config-file example/lldb-dap.json
